@@ -251,7 +251,7 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
 
     set animationName(value: string) {
         this._animationName = value;
-        if (this._templet)
+        if (this._templet && this._animationName)
             this.play(value, this._loop, true);
     }
 
@@ -432,7 +432,7 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
         // this._renderHandle.offset = this._offset;
         this.owner.on(Event.TRANSFORM_CHANGED, this, this.onTransformChanged);
         if (this._skeleton) {
-            if (LayaEnv.isPlaying && this._animationName !== undefined)
+            if (LayaEnv.isPlaying && this._animationName !== undefined && this._animationName !== null)
                 this.play(this._animationName, this._loop, true);
         }
     }
@@ -813,8 +813,12 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
 
     /** @internal */
     reset() {
-        this._templet._removeReference(1);
-        this._templet = null;
+        //caochangli - 容错
+        if (this._templet)
+        {
+            this._templet._removeReference(1);
+            this._templet = null;
+        }
         this._timeKeeper = null;
         this._skeleton = null;
         this._state.clearListeners();
