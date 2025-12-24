@@ -485,6 +485,19 @@ export class HierarchyParser {
             else if ((type = data._$type) != null) {
                 if (type.endsWith(".bp"))
                     addInnerUrl(type, null, true);
+                //caochangli - 预制体中引用的图片资源加入依赖列表
+                else if (type == "GImage") {
+                    let url = data.src;
+                    if (url) {
+                        let index = url.startsWith("res://") ? url.indexOf("@") : -1;
+                        if (index != -1) {
+                            // res://55fd0692-d625-4fe3-b7c9-f27b5de4982b@age_waring_tip
+                            addInnerUrl(url.substring(0,index), Loader.ATLAS);
+                        } else
+                            addInnerUrl(url, Loader.IMAGE);
+                    }
+                }
+                //caochangli - 预制体中引用的图片资源加入依赖列表
                 else if (LayaEnv.isPreview && Utils.isUUID(type)) {
                     let cls = ClassUtils.getClass(type);
                     if (cls == null || cls._$loadable)
