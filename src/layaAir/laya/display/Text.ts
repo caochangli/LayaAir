@@ -1,28 +1,28 @@
-import { Sprite } from "./Sprite";
-import { BitmapFont } from "./BitmapFont";
-import { TextStyle } from "./css/TextStyle";
-import { Event } from "../events/Event";
-import { Point } from "../maths/Point";
-import { Rectangle } from "../maths/Rectangle";
-import { ILaya } from "../../ILaya";
 import { Config } from "../../Config";
-import { Utils } from "../utils/Utils";
-import { DrawRectCmd } from "./cmd/DrawRectCmd";
+import { ILaya } from "../../ILaya";
+import { HideFlags } from "../Const";
+import { Event } from "../events/Event";
 import { HtmlElement, HtmlElementType } from "../html/HtmlElement";
 import { HtmlLink } from "../html/HtmlLink";
-import { Pool } from "../utils/Pool";
-import { IHtmlObject } from "../html/IHtmlObject";
-import { HideFlags } from "../Const";
-import { HtmlParser } from "../html/HtmlParser";
-import { UBBParser } from "../html/UBBParser";
 import { HtmlParseOptions } from "../html/HtmlParseOptions";
+import { HtmlParser } from "../html/HtmlParser";
+import { IHtmlObject } from "../html/IHtmlObject";
+import { UBBParser } from "../html/UBBParser";
+import { Point } from "../maths/Point";
+import { Rectangle } from "../maths/Rectangle";
 import { Browser } from "../utils/Browser";
-import { SpriteConst, TransformKind } from "./SpriteConst";
+import { Pool } from "../utils/Pool";
+import { Utils } from "../utils/Utils";
 import { TextRenderConfig } from "../webgl/text/TextRenderConfig";
-import { Node } from "./Node";
-import { IGraphicsCmd } from "./IGraphics";
+import { BitmapFont } from "./BitmapFont";
+import { DrawRectCmd } from "./cmd/DrawRectCmd";
 import { FillTextCmd } from "./cmd/FillTextCmd";
+import { TextStyle } from "./css/TextStyle";
+import { IGraphicsCmd } from "./IGraphics";
+import { Node } from "./Node";
 import { Render2DProcessor } from "./Render2DProcessor";
+import { Sprite } from "./Sprite";
+import { SpriteConst, TransformKind } from "./SpriteConst";
 
 /**
  * @en The Text class is used to create display objects to show text.
@@ -1960,5 +1960,5 @@ function isHighSurrogate(c: number): boolean {
 }
 
 function isLowSurrogate(c: number): boolean {
-    return c >= 0xDC00 && c <= 0xDFFF;
+    return c >= 0xDC00 && c <= 0xDFFF; 
 }
