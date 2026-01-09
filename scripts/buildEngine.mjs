@@ -1,15 +1,16 @@
+import { spawn } from 'child_process';
 import fs from "fs";
-import path from "path";
 import { glob } from "glob";
-import ts from "typescript";
+import path from "path";
 import { rimrafSync } from "rimraf";
-import { Project } from "ts-morph";
 import { rollup } from "rollup";
 import rollupSourcemaps from "rollup-plugin-sourcemaps";
-import { glsl } from "./rollupPlugins.mjs";
-import { shellExec, onRollupWarn } from "./utils.mjs";
+import { Project } from "ts-morph";
+import ts from "typescript";
 import { allBundles } from "./config.mjs";
-
+import customConfig from './customconfig.json' assert { type: 'json' };
+import { glsl } from "./rollupPlugins.mjs";
+import { onRollupWarn, shellExec } from "./utils.mjs";
 const tscOutPath = "./bin/tsc/";
 const buildOutPath = "./build/libs/";
 
@@ -257,6 +258,25 @@ async function buildDeclarations() {
     fs.writeFileSync("./build/types/LayaAir.d.ts", code);
 
     shellExec("npx", ["copyfiles", '-f', './src/layaAir/tslibs/*.*', './build/types']);
-
+    if(customConfig && customConfig.LayaIDEPath)
+        shellExec("npx", ["copyfiles", '-u 1', './build/*.*', path.join(customConfig.LayaIDEPath,'resources/engine')]);
+    if(customConfig && customConfig.RestartIDE)
+        restartIDE();
     console.timeEnd("completed");
+}
+
+function restartIDE() {
+    let idePath = customConfig && customConfig.LayaIDEPath ? customConfig.LayaIDEPath : '';
+    if (!idePath) return;
+    idePath = path.join(idePath, 'LayaAirIDE.exe');
+    spawn('taskkill', ['/F', '/IM', 'LayaAirIDE.exe'], {
+        shell: true,
+        stdio: 'ignore'
+    }).on('close', () => {
+        spawn(
+            'cmd',
+            ['/c', 'start', '', idePath],
+            { detached: true, shell: true }
+        );
+    });
 }
