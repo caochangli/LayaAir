@@ -20,41 +20,45 @@ import { NodeFlags } from "../Const";
  * @blueprintInheritable
  */
 export class GComboBox extends GLabel {
-    /**
+    /** caochangli - 改成get、set方法
      * @en The direction in which the popup dropdown will appear.
      * @zh 弹出下拉列表将出现的方向。
      */
-    popupDirection: PopupDirection = 0;
+    protected _popupDirection: PopupDirection = 0;
     /**
      * @en The number of items visible in the dropdown list.
      * @zh 下拉列表中可见的项目数量。
      */
     visibleItemCount: number = 0;
 
-    private _items: string[];
-    private _icons: string[];
-    private _values: string[];
+    // caochangli - 废弃
+    // private _items: string[];
+    // private _icons: string[];
+    // private _values: string[];
+    // caochangli - 废弃
 
-    private _dropdownRes: Prefab;
+    protected _dropdownRes: Prefab;
 
-    private _itemsUpdated: boolean;
-    private _selectedIndex: number;
-    private _buttonController: Controller;
-    private _selectedController: ControllerRef;
-    private _dropdown: GWidget;
-    private _list: GList;
+    protected _itemsUpdated: boolean;
+    protected _selectedIndex: number;
+    protected _buttonController: Controller;
+    protected _selectedController: ControllerRef;
+    protected _dropdown: GWidget;
+    protected _list: GList;
 
-    private _down: boolean;
-    private _over: boolean;
+    protected _down: boolean;
+    protected _over: boolean;
 
     constructor() {
         super();
 
         this._itemsUpdated = true;
         this._selectedIndex = -1;
-        this._items = [];
-        this._icons = [];
-        this._values = [];
+        // caochangli - 废弃
+        // this._items = [];
+        // this._icons = [];
+        // this._values = [];
+        // caochangli - 废弃
 
         this.on(Event.ROLL_OVER, this, this._rollover);
         this.on(Event.ROLL_OUT, this, this._rollout);
@@ -63,80 +67,96 @@ export class GComboBox extends GLabel {
     }
 
     /**
-     * @en The list of items in the dropdown.
-     * @zh 下拉列表中的项目列表。
+     * @en The direction in which the popup dropdown will appear.
+     * @zh 弹出下拉列表将出现的方向。
      */
-    get items(): string[] {
-        return this._items;
+    get popupDirection(): PopupDirection
+    {
+        return this._popupDirection;
+    }
+    set popupDirection(value: PopupDirection)
+    {
+        if (this._popupDirection == value) return;
+        this._popupDirection = value;
     }
 
-    set items(value: string[]) {
-        let arr = this._items;
-        arr.length = 0;
-        if (value)
-            arr.push(...value);
+    // caochangli - 废弃
+    // /**
+    //  * @en The list of items in the dropdown.
+    //  * @zh 下拉列表中的项目列表。
+    //  */
+    // get items(): string[] {
+    //     return this._items;
+    // }
 
-        this._itemsUpdated = true;
-        if (SerializeUtil.isDeserializing) {
-            if (arr.length > 0)
-                this._selectedIndex = 0;
-            return;
-        }
+    // set items(value: string[]) {
+    //     let arr = this._items;
+    //     arr.length = 0;
+    //     if (value)
+    //         arr.push(...value);
 
-        if (arr.length > 0) {
-            if (this._selectedIndex >= arr.length)
-                this._selectedIndex = arr.length - 1;
-            else if (this._selectedIndex == -1)
-                this._selectedIndex = 0;
+    //     this._itemsUpdated = true;
+    //     if (SerializeUtil.isDeserializing) {
+    //         if (arr.length > 0)
+    //                 this._selectedIndex = 0;
+    //             return;
+    //     }
 
-            this.title = arr[this._selectedIndex];
-            if (this._selectedIndex < this._icons.length)
-                this.icon = this._icons[this._selectedIndex];
-        }
-        else {
-            this.title = "";
-            if (this._icons)
-                this.icon = null;
-            this._selectedIndex = -1;
-        }
-    }
+    //     if (arr.length > 0) {
+    //         if (this._selectedIndex >= arr.length)
+    //             this._selectedIndex = arr.length - 1;
+    //         else if (this._selectedIndex == -1)
+    //             this._selectedIndex = 0;
 
-    /**
-     * @en The list of icons corresponding to the items in the dropdown.
-     * @zh 下拉列表中项目对应的图标列表。
-     */
-    get icons(): string[] {
-        return this._icons;
-    }
+    //         this.title = arr[this._selectedIndex];
+    //         if (this._selectedIndex < this._icons.length)
+    //             this.icon = this._icons[this._selectedIndex];
+    //     }
+    //     else {
+    //         this.title = "";
+    //         if (this._icons)
+    //             this.icon = null;
+    //         this._selectedIndex = -1;
+    //     }
+    // }
 
-    set icons(value: string[]) {
-        let arr = this._icons;
-        arr.length = 0;
-        if (value)
-            arr.push(...value);
+    // /**
+    //  * @en The list of icons corresponding to the items in the dropdown.
+    //  * @zh 下拉列表中项目对应的图标列表。
+    //  */
+    // get icons(): string[] {
+    //     return this._icons;
+    // }
 
-        this._itemsUpdated = true;
-        if (SerializeUtil.isDeserializing)
-            return;
+    // set icons(value: string[]) {
+    //     let arr = this._icons;
+    //     arr.length = 0;
+    //     if (value)
+    //         arr.push(...value);
 
-        if (this._selectedIndex != -1 && this._selectedIndex < arr.length)
-            this.icon = arr[this._selectedIndex];
-    }
+    //     this._itemsUpdated = true;
+    //     if (SerializeUtil.isDeserializing)
+    //         return;
 
-    /**
-     * @en The list of values corresponding to the items in the dropdown.
-     * @zh 下拉列表中项目对应的值列表。
-     */
-    get values(): string[] {
-        return this._values;
-    }
+    //     if (this._selectedIndex != -1 && this._selectedIndex < arr.length)
+    //         this.icon = arr[this._selectedIndex];
+    // }
 
-    set values(value: string[]) {
-        this._values.length = 0;
-        if (value)
-            this._values.push(...value);
-        this._itemsUpdated = true;
-    }
+    // /**
+    //  * @en The list of values corresponding to the items in the dropdown.
+    //  * @zh 下拉列表中项目对应的值列表。
+    //  */
+    // get values(): string[] {
+    //     return this._values;
+    // }
+
+    // set values(value: string[]) {
+    //     this._values.length = 0;
+    //     if (value)
+    //         this._values.push(...value);
+    //     this._itemsUpdated = true;
+    // }
+    // caochangli - 废弃
 
     /**
      * @en The index of the currently selected item in the dropdown.
@@ -151,36 +171,40 @@ export class GComboBox extends GLabel {
             return;
 
         this._selectedIndex = val;
-        if (val >= 0 && val < this._items.length) {
-            this.title = this._items[val];
-            if (val < this._icons.length)
-                this.icon = this._icons[val];
-        }
-        else {
-            this.title = "";
-            if (this._icons)
-                this.icon = "";
-        }
+        // caochangli - 废弃
+        // if (val >= 0 && val < this._items.length) {
+        //     this.title = this._items[val];
+        //     if (val < this._icons.length)
+        //         this.icon = this._icons[val];
+        // }
+        // else {
+        //     this.title = "";
+        //     if (this._icons)
+        //         this.icon = "";
+        // }
+        // caochangli - 废弃
 
         let cc = this._selectedController?.inst;
         if (cc != null && val >= 0 && val < cc.numPages && !cc.changing)
             this._selectedController.selectedIndex = val;
     }
 
-    /**
-     * @en The value of the currently selected item in the dropdown.
-     * @zh 当前选中下拉列表项目的值。
-     */
-    get value(): string {
-        return this._values[this._selectedIndex];
-    }
+    // caochangli - 废弃
+    // /**
+    //  * @en The value of the currently selected item in the dropdown.
+    //  * @zh 当前选中下拉列表项目的值。
+    //  */
+    // get value(): string {
+    //     return this._values[this._selectedIndex];
+    // }
 
-    set value(val: string) {
-        let index = this._values.indexOf(val);
-        if (index == -1 && val == null)
-            index = this._values.indexOf("");
-        this.selectedIndex = index;
-    }
+    // set value(val: string) {
+    //     let index = this._values.indexOf(val);
+    //     if (index == -1 && val == null)
+    //         index = this._values.indexOf("");
+    //     this.selectedIndex = index;
+    // }
+    // caochangli - 废弃
 
     /**
      * @en The prefab resource used for the dropdown.
@@ -247,10 +271,10 @@ export class GComboBox extends GLabel {
         this._updateDropDown();
         this._list.layout.refresh();
 
-        GRoot.inst.popupMgr.validatePopupPosition(this._dropdown, this, this.popupDirection);
+        GRoot.inst.popupMgr.validatePopupPosition(this._dropdown, this, this._popupDirection);
     }
 
-    private createDropdown() {
+    protected createDropdown() {
         if (this._dropdown) {
             this._dropdown.destroy();
             this._dropdown = null;
@@ -264,6 +288,9 @@ export class GComboBox extends GLabel {
                 console.warn(this._dropdownRes.url + ": should container a list component named list.");
                 return;
             }
+            // caochangli - 开启自动选择
+            this._list.selection.allowSelectedByClick = true;
+            // caochangli - 开启自动选择
             this._list.on(UIEvent.ClickItem, this, this._clickItem);
 
             this._list.addRelation(this._dropdown, RelationType.Width);
@@ -304,7 +331,7 @@ export class GComboBox extends GLabel {
 
     protected setCurrentState() {
         let p = (this._dropdown && this._dropdown.displayedInStage) ? ButtonStatus.Down : (this._over ? ButtonStatus.Over : ButtonStatus.Up);
-        this.setState(this.grayed ? ButtonStatus.Disabled : p);
+        this.setState(!this.enabled ? ButtonStatus.Disabled : p);
     }
 
     protected showDropdown(): void {
@@ -325,29 +352,31 @@ export class GComboBox extends GLabel {
         this._dropdown.width = this.width;
         this._list.layout.refresh();
 
-        GRoot.inst.popupMgr.showPopup(this._dropdown, this, this.popupDirection);
+        GRoot.inst.popupMgr.showPopup(this._dropdown, this, this._popupDirection);
         this.setState(ButtonStatus.Down);
     }
 
-    private _updateDropDown() {
+    protected _updateDropDown() {
         this._itemsUpdated = false;
 
-        this._list.removeChildrenToPool();
-        let cnt = this._items.length;
-        for (let i = 0; i < cnt; i++) {
-            let item = this._list.addItemFromPool();
-            item.name = i < this._values.length ? this._values[i] : "";
-            item.text = this._items[i];
-            item.icon = i < this._icons.length ? this._icons[i] : "";
-        }
-        this._list.resizeToFit(this.visibleItemCount > 0 ? this.visibleItemCount : UIConfig2.defaultComboBoxVisibleItemCount);
+        // caochangli - 废弃
+        // this._list.removeChildrenToPool();
+        // let cnt = this._items.length;
+        // for (let i = 0; i < cnt; i++) {
+        //     let item = this._list.addItemFromPool();
+        //     item.name = i < this._values.length ? this._values[i] : "";
+        //     item.text = this._items[i];
+        //     item.icon = i < this._icons.length ? this._icons[i] : "";
+        // }
+        // this._list.resizeToFit(this.visibleItemCount > 0 ? this.visibleItemCount : UIConfig2.defaultComboBoxVisibleItemCount);
+        // caochangli - 废弃
     }
 
     private _popupWinClosed(): void {
         this.setCurrentState();
     }
 
-    private _clickItem(item: GWidget): void {
+    protected _clickItem(item: GWidget): void {
         GRoot.inst.popupMgr.hidePopup(this._dropdown);
 
         this._selectedIndex = -1;
@@ -355,7 +384,7 @@ export class GComboBox extends GLabel {
         this.event(Event.CHANGED);
     }
 
-    private _rollover(): void {
+    protected _rollover(): void {
         this._over = true;
         if (this._down || this._dropdown && this._dropdown.parent)
             return;
@@ -363,7 +392,7 @@ export class GComboBox extends GLabel {
         this.setCurrentState();
     }
 
-    private _rollout(): void {
+    protected _rollout(): void {
         this._over = false;
         if (this._down || this._dropdown && this._dropdown.parent)
             return;
@@ -371,7 +400,7 @@ export class GComboBox extends GLabel {
         this.setCurrentState();
     }
 
-    private _mousedown(evt: Event): void {
+    protected _mousedown(evt: Event): void {
         if (evt.target instanceof Input)
             return;
 
@@ -379,7 +408,7 @@ export class GComboBox extends GLabel {
         this.showDropdown();
     }
 
-    private _mouseup(): void {
+    protected _mouseup(): void {
         if (this._down) {
             this._down = false;
             this.setCurrentState();

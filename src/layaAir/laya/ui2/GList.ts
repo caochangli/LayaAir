@@ -30,7 +30,7 @@ export class GList extends GPanel {
 
     declare protected _layout: IListLayout;
 
-    private _pool: WidgetPool;
+    protected _pool: WidgetPool;
 
     /** @internal */
     _templateNode: GWidget;

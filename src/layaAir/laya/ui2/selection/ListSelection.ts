@@ -20,6 +20,10 @@ export class ListSelection extends Selection {
 
     get index(): number {
         if (this._layout._virtual) {
+            // caochangli - 换成selectedIndexs处理(更高效)
+            if (this._useChangeSelected)
+                return this._selectedIndexs && this._selectedIndexs.length ? this._selectedIndexs[0] : -1;
+            
             for (let i = 0; i < this._layout._realNumItems; i++) {
                 let ii = this._layout._items[i];
                 if ((ii.obj instanceof GButton) && ii.obj.selected || ii.obj == null && ii.selected) {
@@ -29,8 +33,6 @@ export class ListSelection extends Selection {
                         return i;
                 }
             }
-
-
             return -1;
         }
         else
@@ -53,6 +55,10 @@ export class ListSelection extends Selection {
 
     get(out?: number[]): number[] {
         if (this._layout._virtual) {
+            // caochangli - 换成selectedIndexs处理(更高效)
+            if (this._useChangeSelected)
+                return this._selectedIndexs;
+
             if (!out)
                 out = [];
 
@@ -90,14 +96,17 @@ export class ListSelection extends Selection {
                 this._owner.scroller.scrollTo(index);
 
             this._lastIndex = index;
-            let obj: GWidget;
-            let ii = this._layout._items[index];
-            if (ii.obj)
-                obj = ii.obj;
-            ii.selected = true;
+            // let obj: GWidget;
+            // let ii = this._layout._items[index];
+            // if (ii.obj)
+            //     obj = ii.obj;
+            // ii.selected = true;
 
-            if ((obj instanceof GButton) && !obj.selected)
-                obj.selected = true;
+            // if ((obj instanceof GButton) && !obj.selected)
+            //     obj.selected = true;
+
+            // caochangli - 修复无限循环列表选中逻辑BUG
+            this._setSelectedIndex(index,true);
         }
         else
             super.add(index, scrollItToView);
@@ -108,14 +117,17 @@ export class ListSelection extends Selection {
             if (this._mode == SelectionMode.Disabled)
                 return;
 
-            let obj: GWidget;
-            let ii = this._layout._items[index];
-            if (ii.obj)
-                obj = ii.obj;
-            ii.selected = false;
+            // let obj: GWidget;
+            // let ii = this._layout._items[index];
+            // if (ii.obj)
+            //     obj = ii.obj;
+            // ii.selected = false;
 
-            if (obj instanceof GButton)
-                obj.selected = false;
+            // if (obj instanceof GButton && obj.selected)
+            //     obj.selected = false;
+
+            // caochangli - 修复无限循环列表选中逻辑BUG
+            this._setSelectedIndex(index,false);
         }
         else
             super.remove(index);
@@ -123,6 +135,19 @@ export class ListSelection extends Selection {
 
     clear(): void {
         if (this._layout._virtual) {
+            // caochangli - 换成selectedIndexs处理(更高效)
+            if (this._useChangeSelected)
+            {   
+                if (!this._selectedIndexs || this._selectedIndexs.length <= 0)
+                    return;
+                for (let i = 0,length = this._selectedIndexs.length; i < length; i++)
+                {
+                    this._setSelectedIndex(this._selectedIndexs[i],false,false);
+                }
+                this._selectedIndexs.length = 0;
+                return;
+            }
+
             for (let i = 0; i < this._layout._realNumItems; i++) {
                 let ii = this._layout._items[i];
                 if (ii.obj instanceof GButton)
@@ -134,8 +159,25 @@ export class ListSelection extends Selection {
             super.clear();
     }
 
-    protected clearExcept(g: GWidget): void {
+    protected clearExcept(g: GWidget,exceptIndex:number): void {
         if (this._layout._virtual) {
+            // caochangli - 换成selectedIndexs处理(更高效)
+            if (this._useChangeSelected)
+            {
+                if (!this._selectedIndexs || this._selectedIndexs.length <= 0)
+                    return;
+                for (let length = this._selectedIndexs.length,i = length - 1; i >= 0; i--)
+                {
+                    let index = this._selectedIndexs[i];
+                    if (index != exceptIndex)
+                    {
+                        this._setSelectedIndex(index,false,false);
+                        this._selectedIndexs.splice(i,1);
+                    }
+                }
+                return;
+            }
+
             for (let i = 0; i < this._layout._realNumItems; i++) {
                 let ii = this._layout._items[i];
                 if (ii.obj != g) {
@@ -146,12 +188,36 @@ export class ListSelection extends Selection {
             }
         }
         else
-            super.clearExcept(g);
+            super.clearExcept(g,exceptIndex);
     }
 
     selectAll(): void {
         if (this._layout._virtual) {
             this._layout._checkVirtualList();
+
+            // caochangli - 更高效
+            if (this._useChangeSelected)
+            {
+                let realNumItems = this._layout._realNumItems;
+                if (realNumItems <= 0)
+                    return;
+                let item = this._layout._items;
+                let numItems = this._layout.numItems;
+                if (!this._selectedIndexs)
+                    this._selectedIndexs = [];
+                else
+                    this._selectedIndexs.length = 0;
+                for (let i = 0; i < realNumItems; i++) {
+                    let ii = item[i];
+                    if ((ii.obj instanceof GButton) && !ii.obj.selected) {
+                        ii.obj.selected = true;
+                    }
+                    ii.selected = true;
+                    if (i < numItems)
+                        this._selectedIndexs.push(i);
+                }
+                return;
+            }
 
             for (let i = 0; i < this._layout._realNumItems; i++) {
                 let ii = this._layout._items[i];
@@ -168,6 +234,31 @@ export class ListSelection extends Selection {
     selectReverse(): void {
         if (this._layout._virtual) {
             this._layout._checkVirtualList();
+
+            // caochangli - 更高效
+            if (this._useChangeSelected)
+            {
+                let realNumItems = this._layout._realNumItems;
+                if (realNumItems <= 0)
+                    return;
+                let item = this._layout._items;
+                let numItems = this._layout.numItems;
+                if (!this._selectedIndexs)
+                    this._selectedIndexs = [];
+                else
+                    this._selectedIndexs.length = 0;
+                for (let i = 0; i < realNumItems; i++) {
+                    let ii = item[i];
+                    let curSelected = !ii.selected;
+                    if ((ii.obj instanceof GButton)) {
+                        ii.obj.selected = curSelected;
+                    }
+                    ii.selected = curSelected;
+                    if (curSelected && i < numItems)
+                        this._selectedIndexs.push(i);
+                }
+                return;
+            }
 
             for (let i = 0; i < this._layout._realNumItems; i++) {
                 let ii = this._layout._items[i];
@@ -190,6 +281,10 @@ export class ListSelection extends Selection {
             if (evt.button === 2 && !this.allowSelectByRightClick)
                 return;
 
+            // caochangli - 不允许点击选中
+            if (evt.button == 0 && !this.allowSelectedByClick)
+                return;
+
             if (item.mode == ButtonMode.Common) {
                 this._owner.event(UIEvent.ClickItem, [item, evt]);
                 return;
@@ -201,14 +296,19 @@ export class ListSelection extends Selection {
             if (this._mode == SelectionMode.Disabled) {
                 //nothing
             }
+            // caochangli - 单选：只能选中不能取消？- 给ComboBox用的？
             else if (this._mode == SelectionMode.Single) {
                 if (!item.selected) {
-                    this.clearExcept(item);
-                    item.selected = true;
+                    this.clearExcept(item,index);
+                    // item.selected = true;
+                    // caochangli - 修复无限循环列表选中逻辑BUG
+                    this._setSelectedIndex(index,true);
                     item.event(Event.CHANGED);
                 }
             }
+            // caochangli - 多选
             else {
+                // caochangli - 按住shift：只能选中不能取消？
                 if (evt.shiftKey) {
                     if (!item.selected) {
                         if (this._lastIndex != -1) {
@@ -217,35 +317,46 @@ export class ListSelection extends Selection {
                             max = Math.min(max, this._layout.numItems - 1);
 
                             for (let i = min; i <= max; i++) {
+                                // caochangli - 修复无限循环列表选中逻辑BUG
+                                this._setSelectedIndex(i,true);
                                 let ii = this._layout._items[i];
                                 if (ii.obj instanceof GButton) {
-                                    ii.obj.selected = true;
+                                    // ii.obj.selected = true;
                                     if (ii.obj == item)
                                         item.event(Event.CHANGED);
                                 }
-                                ii.selected = true;
+                                // ii.selected = true;
                             }
 
                             dontChangeLastIndex = true;
                         }
                         else {
-                            item.selected = true;
+                            // item.selected = true;
+                            // caochangli - 修复无限循环列表选中逻辑BUG
+                            this._setSelectedIndex(index,true);
                             item.event(Event.CHANGED);
                         }
                     }
                 }
+                // caochangli - 按住ctrl或meta或多选单击实现：可选中可取消
                 else if ((evt.ctrlKey || evt.metaKey) || this._mode == SelectionMode.MultipleBySingleClick) {
-                    item.selected = !item.selected;
+                    // item.selected = !item.selected;
+                    // caochangli - 修复无限循环列表选中逻辑BUG
+                    this._setSelectedIndex(index,!item.selected);
                     item.event(Event.CHANGED);
                 }
                 else {
+                    // caochangli - 只能选中
                     if (!item.selected) {
-                        this.clearExcept(item);
-                        item.selected = true;
+                        this.clearExcept(item,index);
+                        // item.selected = true;
+                        // caochangli - 修复无限循环列表选中逻辑BUG
+                        this._setSelectedIndex(index,true);
                         item.event(Event.CHANGED);
                     }
-                    else if (evt.button == 0)
-                        this.clearExcept(item);
+                    // caochangli - 多余调用
+                    // else if (evt.button == 0)
+                    //     this.clearExcept(item,index);
                 }
             }
 
@@ -332,4 +443,137 @@ export class ListSelection extends Selection {
         else
             return super.handleArrowKey(dir, evt);
     }
+
+
+
+//#region 功能扩展
+
+    /**获取选中的Item */
+    get selectedItem():GWidget | null {
+        if (this._layout._virtual) 
+        {
+            let index = this.index;
+            if (index == -1)
+                return null;
+            if (this._layout._loop) 
+            {
+                let item = this._layout._items;
+                let realNumItems = this._layout._realNumItems;
+                let numItems = this._layout.numItems;
+                for (let i = index; i < realNumItems; i=i+numItems)
+                {
+                    let ii = item[i];
+                    if (ii && ii.obj)
+                        return ii.obj;
+                }
+                return null;
+            }
+            else 
+            {
+                let ii = this._layout._items[index];
+                return ii ? ii.obj : null;
+            }
+        }
+        else
+            return super.selectedItem;
+    }
+
+    /**获取选中的Item列表 */
+    get selectedItems():Array<GWidget> | null {
+        if (this._layout._virtual) 
+        {
+            let indexs = this.get();
+            if (!indexs || indexs.length <= 0)
+                return null;
+            let result = [];
+            let items = this._layout._items;
+            if (this._layout._loop) 
+            {
+                let realNumItems = this._layout._realNumItems;
+                let numItems = this._layout.numItems;
+                for (let i = 0,length = indexs.length; i < length; i++)
+                {
+                    for (let j = indexs[i]; j < realNumItems; j=j+numItems)
+                    {
+                        let ii = items[j];
+                        if (ii && ii.obj)
+                            result.push(ii.obj);
+                    }
+                }
+                return result;
+            }
+            else 
+            {
+                for (let i = 0,length = indexs.length; i < length; i++)
+                {
+                    let ii = items[indexs[i]];
+                    if (ii && ii.obj)
+                        result.push(ii.obj);
+                }
+                return result;
+            }
+        }
+        else
+            return super.selectedItems;
+    }
+
+    /**当前正在渲染的Item列表 */
+    get rendererItems():Array<GWidget> | null {
+        if (this._layout._virtual) 
+        {
+            let realNumItems = this._layout._realNumItems;
+            if (realNumItems <= 0)
+                return null;
+            let result = [];
+            let items = this._layout._items;
+            for (let i = 0; i < realNumItems; i++)
+            {
+                let ii = items[i];
+                if (ii && ii.obj)
+                    result.push(ii.obj);
+            }
+            return result;
+        }
+        else
+            return super.rendererItems;
+    }
+
+    // caochangli - 设置选择索引
+    protected _setSelectedIndex(index:number,selected:boolean,isChangeRecord:boolean = true) {
+        if (isChangeRecord)
+        {
+            if (selected)
+                this._addSelectedIndex(index);
+            else
+                this._removeSelectedIndex(index);
+        }
+        
+        if (this._layout._loop)
+        {
+            let items = this._layout._items;
+            let realNumItems = this._layout._realNumItems;
+            let numItems = this._layout.numItems;
+            for (let i = index; i < realNumItems; i=i+numItems)
+            {
+                let ii = items[i];
+                if (ii)
+                {
+                    ii.selected = selected;
+                    if ((ii.obj instanceof GButton) && ii.obj.selected != selected)
+                        ii.obj.selected = selected;
+                }    
+            }    
+        }
+        else
+        {
+            let obj: GWidget;
+            let ii = this._layout._items[index];
+            if (ii.obj)
+                obj = ii.obj;
+            ii.selected = selected;
+            if ((obj instanceof GButton) && obj.selected != selected)
+                obj.selected = selected;
+        }
+    } 
+//#endregion
 }

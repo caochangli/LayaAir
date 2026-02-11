@@ -27,23 +27,23 @@ const downEffectValueS = 0.9;
  * @blueprintInheritable
  */
 export class GButton extends GLabel {
-    private _mode: ButtonMode;
-    private _selected: boolean = false;
+    protected _mode: ButtonMode;
+    protected _selected: boolean = false;
 
-    private _titleStr: string = "";
-    private _iconStr: string = "";
-    private _selectedTitleStr: string = "";
-    private _selectedIconStr: string = "";
-    private _sound: string;
-    private _soundVolumeScale: number = 0;
-    private _buttonController: Controller;
-    private _selectedController: ControllerRef;
-    private _selectedPage: number = 0;
-    private _changeStateOnClick: boolean;
-    private _downEffect: ButtonDownEffect = 0;
-    private _scaleEffect: boolean = false;
-    private _down: boolean;
-    private _over: boolean;
+    protected _titleStr: string = "";
+    protected _iconStr: string = "";
+    protected _selectedTitleStr: string = "";
+    protected _selectedIconStr: string = "";
+    protected _sound: string;
+    protected _soundVolumeScale: number = 0;
+    protected _buttonController: Controller;
+    protected _selectedController: ControllerRef;
+    protected _selectedPage: number = 0;
+    protected _changeStateOnClick: boolean;
+    protected _downEffect: ButtonDownEffect = 0;
+    protected _scaleEffect: boolean = false;
+    protected _down: boolean;
+    protected _over: boolean;
 
     constructor() {
         super();
@@ -166,7 +166,7 @@ export class GButton extends GLabel {
 
     /**
      * @en Indicates whether the button is currently selected.
-     * @zh 按钮当前是否被选中。
+     * @zh 按钮当前是否被选中。主动设置不派发Event.CHANGED事件
      */
     get selected(): boolean {
         return this._selected;
@@ -310,15 +310,22 @@ export class GButton extends GLabel {
             for (let child of this.children) {
                 if (child instanceof GImage) {
                     if (isDown) {
-                        (<any>child)[SaveColorSymbol] = child.color;
-                        tmpColor.parse(child.color);
-                        tmpColor.r *= downEffectValueC;
-                        tmpColor.g *= downEffectValueC;
-                        tmpColor.b *= downEffectValueC;
-                        child.color = tmpColor.toString();
+                        // caochangli - 做个反复执行保护
+                        if (!(<any>child)[SaveColorSymbol])
+                        {
+                            (<any>child)[SaveColorSymbol] = child.color;
+                            tmpColor.parse(child.color);
+                            tmpColor.r *= downEffectValueC;
+                            tmpColor.g *= downEffectValueC;
+                            tmpColor.b *= downEffectValueC;
+                            child.color = tmpColor.toString();
+                        }
                     }
                     else if ((<any>child)[SaveColorSymbol])
+                    {
                         child.color = (<any>child)[SaveColorSymbol];
+                        (<any>child)[SaveColorSymbol] = null;
+                    }    
                 }
             }
         }
@@ -341,9 +348,9 @@ export class GButton extends GLabel {
 
     protected setCurrentState() {
         if (this._selected)
-            this.setState(this.grayed ? ButtonStatus.SelectedDisabled : (this._over ? ButtonStatus.SelectedOver : ButtonStatus.Down));
+            this.setState(!this.enabled ? ButtonStatus.SelectedDisabled : (this._over ? ButtonStatus.SelectedOver : ButtonStatus.Down));
         else
-            this.setState(this.grayed ? ButtonStatus.Disabled : (this._over ? ButtonStatus.Over : ButtonStatus.Up));
+            this.setState(!this.enabled ? ButtonStatus.Disabled : (this._over ? ButtonStatus.Over : ButtonStatus.Up));
     }
 
     protected _controllersChanged(): void {
@@ -371,45 +378,45 @@ export class GButton extends GLabel {
         this.selected = this._selectedPage == this._selectedController.selectedIndex;
     }
 
-    private _rollover(): void {
+    protected _rollover(): void {
         this._over = true;
         if (this._down)
             return;
 
-        if (this.grayed)
+        if (!this.enabled)
             return;
 
         this.setState(this._selected ? ButtonStatus.SelectedOver : ButtonStatus.Over);
     }
 
-    private _rollout(): void {
+    protected _rollout(): void {
         this._over = false;
         if (this._down)
             return;
 
-        if (this.grayed)
+        if (!this.enabled)
             return;
 
         this.setState(this._selected ? ButtonStatus.Down : ButtonStatus.Up);
     }
 
-    private _btnTouchBegin(evt: Event): void {
+    protected _btnTouchBegin(evt: Event): void {
         if (evt.button != 0)
             return;
 
         this._down = true;
 
         if (this._mode == ButtonMode.Common) {
-            this.setState(this.grayed ? ButtonStatus.SelectedDisabled : ButtonStatus.Down);
+            this.setState(!this.enabled ? ButtonStatus.SelectedDisabled : ButtonStatus.Down);
         }
     }
 
-    private _btnTouchEnd(): void {
+    protected _btnTouchEnd(): void {
         if (this._down) {
             this._down = false;
 
             if (this._mode == ButtonMode.Common) {
-                this.setState(this.grayed ? ButtonStatus.Disabled : (this._over ? ButtonStatus.Over : ButtonStatus.Up));
+                this.setState(!this.enabled ? ButtonStatus.Disabled : (this._over ? ButtonStatus.Over : ButtonStatus.Up));
             }
             else {
                 if (!this._over
@@ -430,10 +437,11 @@ export class GButton extends GLabel {
         if (this._sound)
             SoundManager.playSound(this._sound).volume = this._soundVolumeScale;
 
+        // caochangli - 增加备注：List的选择器是“单选&多选等”才触发
         let ss = (<GPanel>this.parent)?.selection;
         if (ss && ss.mode != SelectionMode.None) {
             ss.handleClick(this, evt);
-
+            // caochangli - 增加备注：此按钮是单选&多选则return
             if (this._mode != ButtonMode.Common)
                 return;
         }
@@ -441,13 +449,15 @@ export class GButton extends GLabel {
         if (this._mode == ButtonMode.Check) {
             if (this._changeStateOnClick) {
                 this.selected = !this._selected;
-                this.event(Event.CHANGED);
+                // caochangli - 事件带上自己
+                this.event(Event.CHANGED,this);
             }
         }
         else if (this._mode == ButtonMode.Radio) {
             if (this._changeStateOnClick && !this._selected) {
                 this.selected = true;
-                this.event(Event.CHANGED);
+                // caochangli - 事件带上自己
+                this.event(Event.CHANGED,this);
             }
         }
         else {

@@ -7,9 +7,14 @@ import { GearDisplay } from "./gear/GearDisplay";
 
 /**
  * @en Controller class manages a set of pages, allowing for selection and change notifications.
- * @zh 控制器类管理一组页面，允许选择和更改通知。
+ * @zh 控制器类管理一组页面，允许选择和更改通知。- 控制器修改默认不选中(IDE不好改，就没动了，也就是说IDE中设置的默认选中是无效的)
  */
 export class Controller extends EventDispatcher {
+    /** caochangli - 控制器修改默认不选中(IDE不好改，就没动了，也就是说IDE中设置的默认选中是无效的)
+     * @zh 是否默认选中
+     */
+    protected _defaultSelected:boolean = false;
+
     private _selectedIndex: number;
     private _previousIndex: number;
     private _pages: string[];
@@ -42,6 +47,41 @@ export class Controller extends EventDispatcher {
     }
 
     /**
+     * @en The direction in which the popup dropdown will appear.
+     * @zh 弹出下拉列表将出现的方向。
+     */
+    get defaultSelected(): boolean
+    {
+        return this._defaultSelected;
+    }
+    set defaultSelected(value: boolean)
+    {
+        if (this._defaultSelected == value) return;
+        this._defaultSelected = value;
+    }
+
+    /**
+     * 根据索引选中页面 - caochangli：增加是否派发changed事件选项
+     * @param index 索引
+     * @param isSendChanged 是否派发changed事件，默认true
+     */
+    setSelectedIndex(index: number, isSendChanged:boolean = true) {
+        this._setSelectedIndex(index,isSendChanged);
+    }
+
+    /**
+     * 根据名称选中页面 - caochangli：增加是否派发changed事件选项
+     * @param pageName 页面名称
+     * @param isSendChanged 是否派发changed事件
+     */
+    setSelectedPage(pageName: string, isSendChanged:boolean = true) {
+        let index = this._pages.indexOf(pageName);
+        if (index === -1)
+            index = 0;
+        this._setSelectedIndex(index,isSendChanged);
+    }
+
+    /**
      * @en Pages of the controller.
      * @zh 控制器的页面。
      */
@@ -52,7 +92,8 @@ export class Controller extends EventDispatcher {
     set pages(value: Array<string>) {
         this._pages = value;
 
-        if (value.length > 0 && this._selectedIndex == -1)
+        // caochangli - 加是否默认选中开关
+        if (this._defaultSelected && value.length > 0 && this._selectedIndex == -1)
             this.selectedIndex = 0;
     }
 
@@ -80,7 +121,8 @@ export class Controller extends EventDispatcher {
         name = name || "";
         this._pages.push(name);
 
-        if (this._selectedIndex == -1)
+        // caochangli - 加是否默认选中开关
+        if (this._defaultSelected && this._selectedIndex == -1)
             this.selectedIndex = 0;
 
         return this;
@@ -95,30 +137,33 @@ export class Controller extends EventDispatcher {
     }
 
     set selectedIndex(value: number) {
-        if (this._pages.length == 0)
-            return;
+        // if (this._pages.length == 0)
+        //     return;
 
-        if (this._selectedIndex != value) {
-            if (value > this._pages.length - 1) {
-                console.warn(`index out of bounds: ${value}`);
-                return;
-            }
+        // if (this._selectedIndex != value) {
+        //     if (value > this._pages.length - 1) {
+        //         console.warn(`index out of bounds: ${value}`);
+        //         return;
+        //     }
 
-            this._previousIndex = this._selectedIndex;
-            this._selectedIndex = value;
+        //     this._previousIndex = this._selectedIndex;
+        //     this._selectedIndex = value;
 
-            (<Mutable<this>>this).changing = true;
-            try {
-                for (let ref of this._refs) {
-                    ref.onChanged(this);
-                }
-                GearDisplay.checkAll(this);
-                this.event(Event.CHANGED);
-            }
-            finally {
-                (<Mutable<this>>this).changing = false;
-            }
-        }
+        //     (<Mutable<this>>this).changing = true;
+        //     try {
+        //         for (let ref of this._refs) {
+        //             ref.onChanged(this);
+        //         }
+        //         GearDisplay.checkAll(this);
+        //         this.event(Event.CHANGED);
+        //     }
+        //     finally {
+        //         (<Mutable<this>>this).changing = false;
+        //     }
+        // }
+
+        // caochangli - 方法提取，增加是否派发changed事件
+        this._setSelectedIndex(value);
     }
 
     /**
@@ -156,6 +201,35 @@ export class Controller extends EventDispatcher {
             this.selectedIndex = 0;
         else if (this._pages.length > 1)
             this.selectedIndex = 1;
+    }
+
+    // caochangli - set selectedIndex方法提取到此处，增加是否派发changed事件逻辑
+    private _setSelectedIndex(value:number, isSendChanged:boolean = true) {
+        if (this._pages.length == 0)
+            return;
+
+        if (this._selectedIndex != value) {
+            if (value > this._pages.length - 1) {
+                console.warn(`index out of bounds: ${value}`);
+                return;
+            }
+
+            this._previousIndex = this._selectedIndex;
+            this._selectedIndex = value;
+
+            (<Mutable<this>>this).changing = true;
+            try {
+                for (let ref of this._refs) {
+                    ref.onChanged(this);
+                }
+                GearDisplay.checkAll(this);
+                if (isSendChanged)
+                    this.event(Event.CHANGED,this);
+            }
+            finally {
+                (<Mutable<this>>this).changing = false;
+            }
+        }
     }
 
     /** @internal @blueprintEvent */

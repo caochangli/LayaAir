@@ -38,8 +38,17 @@ import { Config } from "../../Config";
 import { MathUtil } from "../maths/MathUtil";
 import { FilterMode } from "../RenderEngine/RenderEnum/FilterMode";
 import { RenderCapable } from "../RenderEngine/RenderEnum/RenderCapable";
+import { Tween } from "../tween/Tween";
+// import { ArrayPool } from "../sgsExpand/pool/ArrayPool";
+// import { ISEventDispatcher } from "../sgsExpand/event/ISEventDispatcher";
+// import { ISEventTarget } from "../sgsExpand/event/ISEventTarget";
+// import { SEventSystem } from "../sgsExpand/event/SEventSystem";
+import { IAssetGroup, AssetGroup } from "../sgsExpand/loader/AssetGroup";
+import { Loader } from "../net/Loader";
+
 
 const hiddenBits = NodeFlags.NOT_IN_PAGE;
+
 
 /**
  * @en Sprite is a basic display list node for displaying graphical content. By default, Sprite does not accept mouse events. Through the graphics API, images or vector graphics can be drawn, supporting operations like rotation, scaling, translation, and more. Sprite also functions as a container class, allowing the addition of multiple child nodes.
@@ -282,6 +291,34 @@ export class Sprite extends Node {
      * @param destroyChild 是否删除子节点。默认为 true。
      */
     destroy(destroyChild: boolean = true): void {
+
+// caochangli - 补充一些清理工作
+        //清理定时器
+        let timer = this.timer;
+        if (timer)
+            this.timer.clearAll(this);
+        if (timer !== ILaya.timer)
+            ILaya.timer.clearAll(this);
+
+        //清理缓动
+        Tween.killAll(this);
+
+        // //删除我监听别人的所有事件
+        // this.offAllLogicListener();
+        // //删除别人监听我的所有事件
+        // this.offAllLogicDispatcher();
+        // if (this._sEventArray)
+        // {
+        //     ArrayPool.Release(this._sEventArray);
+        //     this._sEventArray = null;
+        // }
+        // if (this._sDispatcher)
+        // {
+        //     SEventSystem.Ins.RemoveDispatcher(this._sDispatcher);
+        //     this._sDispatcher = null;
+        // }
+// caochangli - 补充一些清理工作
+
         super.destroy(destroyChild);
         if (this._texture) {
             this._texture._removeReference();
@@ -313,7 +350,26 @@ export class Sprite extends Node {
         }
 
         this.setGraphics(null);
-        this._struct = null;
+        // this._struct = null;
+
+// caochangli - 回收处理
+        if (this._struct)
+        {
+            this._struct.owner = null;
+            this._struct = null;
+        }
+        //回收使用loadImage接口加载的资源
+        if (this._imgAssetGroup)
+        {
+            AssetGroup.Release(this._imgAssetGroup);
+            this._imgAssetGroup = null;
+        }
+        // //回收资源 - 业务层在UI中加载资源
+        // if (this._assetGroup)
+        // {
+        //     AssetGroup.Release(this._assetGroup);
+        //     this._assetGroup = null;
+        // }
     }
 
     /**
@@ -1166,19 +1222,27 @@ export class Sprite extends Node {
         if (this._texture == value)
             return;
 
-        this._texture && this._texture._removeReference();
-        this._texture = value;
-        if (value) {
-            value._addReference();
-            this.graphics.repaint();
-        } else {
-            if (this._graphics) {
-                this._graphics.repaint();
-            } else {
-                this.repaint();
-            }
-        }
+        // caochangli - 停止加载
+        this._cancelImgLoad();
+
+        // this._texture && this._texture._removeReference();
+        // this._texture = value;
+        // if (value) {
+        //     value._addReference();
+        //     this.graphics.repaint();
+        // } else {
+        //     if (this._graphics) {
+        //         this._graphics.repaint();
+        //     } else {
+        //         this.repaint();
+        //     }
+        // }
+
+        // caochangli - 方法提取，解决停止加载功能冲突
+        this._setTexture(value);
     }
+
+    
 
     /**
      * @en 2D sprite material
@@ -1900,6 +1964,9 @@ export class Sprite extends Node {
             point = ele.fromParentPoint(point);
             i--;
         }
+        // caochangli - 内存泄漏处理
+        tmpSpriteList.length = 0;
+        // caochangli - 内存泄漏处理
         return point;
     }
 
@@ -1960,24 +2027,28 @@ export class Sprite extends Node {
      * @returns 返回精灵对象本身。
      */
     loadImage(url: string, complete?: Handler): this {
-        if (!url) {
-            this.texture = null;
-            complete && complete.run();
-        } else {
-            let tex = ILaya.loader.getRes(url);
-            if (tex) {
-                this.texture = tex;
-                complete && complete.run();
-            }
-            else {
-                if (this._skinBaseUrl)
-                    url = URL.formatURL(url, this._skinBaseUrl);
-                ILaya.loader.load(url).then((tex: Texture) => {
-                    this.texture = tex;
-                    complete && complete.run();
-                });
-            }
-        }
+        // if (!url) {
+        //     this.texture = null;
+        //     complete && complete.run();
+        // } else {
+        //     let tex = ILaya.loader.getRes(url);
+        //     if (tex) {
+        //         this.texture = tex;
+        //         complete && complete.run();
+        //     }
+        //     else {
+        //         if (this._skinBaseUrl)
+        //             url = URL.formatURL(url, this._skinBaseUrl);
+        //         ILaya.loader.load(url).then((tex: Texture) => {
+        //             this.texture = tex;
+        //             complete && complete.run();
+        //         });
+        //     }
+        // }
+
+        //caochangli - 走业务层资源管理器
+        this._loadImage(url,complete);
+
         return this;
     }
 
@@ -2582,6 +2653,446 @@ export class Sprite extends Node {
         [SpriteGlobalTransform.CHANGED]: (type: number) => void;
         [Event.TRANSFORM_CHANGED]: () => void;
     };
+
+
+//#region caochangli - 功能扩展
+
+//#region loadImage相关
+    
+    // caochangli - set texture提到此处，解决停止加载功能冲突
+    private _setTexture(value: Texture) {
+        this._texture && this._texture._removeReference();
+        this._texture = value;
+        if (value) {
+            value._addReference();
+            this.graphics.repaint();
+        } else {
+            if (this._graphics) {
+                this._graphics.repaint();
+            } else {
+                this.repaint();
+            }
+        }
+    }
+
+    private _imgAssetGroup:IAssetGroup;
+    private _loadImage(url:string,complete?: Handler) {
+
+        //空路径
+        if (!url)
+        {
+            this.texture = null;
+            complete && complete.run();
+            return;
+        }
+
+        //本次需要的资源正在加载中 - 等待加载完成
+        if (this._imgAssetGroup && this._imgAssetGroup.IsResLoading(url))
+            return;
+
+        if (!this._imgAssetGroup)
+            this._imgAssetGroup = AssetGroup.Get();
+        else
+            this._imgAssetGroup.CancelAllAssets(true);
+
+        //没有获取到AssetGroup - 走引擎原逻辑
+        if (!this._imgAssetGroup)
+        {
+            let tex = ILaya.loader.getRes(url);
+            if (tex) {
+                this.texture = tex;
+                complete && complete.run();
+            }
+            else {
+                if (this._skinBaseUrl)
+                    url = URL.formatURL(url, this._skinBaseUrl);
+                ILaya.loader.load(url).then((tex: Texture) => {
+                    this.texture = tex;
+                    complete && complete.run();
+                });
+            }
+            return;
+        }
+
+        let tex:Texture = ILaya.loader.getRes(url);
+        if (tex && tex.url)
+        {   
+            //图集中小图 - 计数记到图集上
+            if (tex._atlas && tex._atlas.url)
+                this._imgAssetGroup.OnlyAddReference(tex._atlas.url);
+            else
+                this._imgAssetGroup.OnlyAddReference(tex.url,tex);
+            this._setTexture(tex);
+            complete && complete.run();
+        }
+        else//需要加载资源
+        {
+            //清空上一次纹理
+            this.texture = null;
+
+            this._imgAssetGroup.Load(url,Loader.IMAGE,this,(url:string,res:Texture)=>{
+                this._setTexture(res);
+                complete && complete.run();
+            });
+        }
+    }
+    private _cancelImgLoad() {
+        if (this._imgAssetGroup)
+            this._imgAssetGroup.CancelAllAssets(true);
+    }
+//#endregion loadImage相关
+
+
+//#region 逻辑事件相关
+    
+        // /**记录的监听逻辑事件 - 我监听别人的事件*/
+        // private _sEventArray:Array<ISEventDispatcher>;
+        
+        // /**逻辑事件调度类 - 别人监听我的事件 */
+        // private _sDispatcher:ISEventDispatcher;
+    
+        // /**逻辑事件调度类*/
+        // public get SDispatcher():ISEventDispatcher
+        // {
+        //     if(!this._sDispatcher)
+        //         this._sDispatcher = SEventSystem.Ins.CreateDispatcher();
+        //     return this._sDispatcher;
+        // }
+    
+        // /**我监听别人的target */
+        // get SEventArray(): ISEventDispatcher[] {
+        //     return this._sEventArray;
+        // }
+    
+        // /**是否有人监听我 */
+        // get SDispatcherVaild(): boolean {
+        //     return this._sDispatcher ? this._sDispatcher.Vaild : false;
+        // }
+    
+        // /**
+        //  * 监听逻辑事件
+        //  * @param target 监听的对象
+        //  * @param eventID 事件ID
+        //  * @param listener 监听方法 - 可以使用多个参数(param1 : any , param2 : any) 接收 event [param1 , param2 ...] 传出的参数
+        //  * @param args 额外参数
+        //  */
+        // onLogic(target:ISEventTarget, eventID:number, listener:Function, args?:any):void
+        // {
+        //     let targetDispatcher = target.SDispatcher;
+        //     targetDispatcher.On(eventID, this, listener, args);
+        //     if(!this._sEventArray)
+        //         this._sEventArray = ArrayPool.Get() || [];
+        //     let index = this._sEventArray.indexOf(targetDispatcher);
+        //     if(index < 0)
+        //         this._sEventArray.push(targetDispatcher);
+        // }
+    
+        // /**
+        //  * 移除逻辑事件
+        //  * @param target 监听的对象
+        //  * @param eventID 事件ID
+        //  * @param listener 监听方法
+        //  */
+        // offLogic(target:ISEventTarget, eventID:number, listener:Function):void
+        // {
+        //     if(target.SDispatcherVaild)
+        //         target.SDispatcher.Off(eventID, this, listener, true, false);
+        // }
+    
+        // /**
+        //  * 发送逻辑事件
+        //  * @param eventID 事件 ID
+        //  * @param data 多个参数 使用 [param1 , param2 ...] 传入 , 如果单个参数是数组 也必须使用 [param1] 的方式传入 , 否则监听回调 只会收到数组第一个元素
+        //  */
+        // loginEvent(eventID:number, data?:any):boolean
+        // {
+        //     if(!this._sDispatcher) 
+        //         return false;
+        //     return this._sDispatcher.Event(eventID, data);
+        // }
+    
+        // /**移除所有别人监听我的事件 - 业务没有需求调用，只在自己销毁时执行*/
+        // private offAllLogicDispatcher(): void 
+        // {
+        //     if(!this._sDispatcher)
+        //         return;
+        //     this._sDispatcher.OffAll(true);
+        // }
+    
+        // /**移除所有我监听别人的事件*/
+        // offAllLogicListener(): void 
+        // {
+        //     if(this._sEventArray)
+        //     {
+        //         for(let i = 0; i < this._sEventArray.length; i++)
+        //         {
+        //             let target = this._sEventArray[i];
+        //             if(!target) continue;
+        //             target.OffAllByCaller(this, false, false);
+        //         }
+        //         this._sEventArray.length = 0;
+        //     }
+        // }
+    
+        // /**移除caller为target的所有别人监听我的逻辑事件 */
+        // // private offLogicAllDispatcherByCaller(target:ISEventTarget):void
+        // // {
+        // //     if(!this._sDispatcher)
+        // //         return;
+        // //     this._sDispatcher.OffAllByCaller(target, true, false);
+        // // }
+    
+        // /**移除caller为target的所有我监听别人的逻辑事件 */
+        // offLogicAllListenerByCaller(target:ISEventTarget):void
+        // {
+        //     let targetDispatcher = target.SDispatcher;
+        //     if (targetDispatcher) 
+        //         targetDispatcher.OffAllByCaller(target, true, false);
+        // }
+//#endregion 逻辑事件相关
+    
+    
+//#region 资源加载相关
+    
+        // /**资源管理器 */
+        // private _assetGroup:IAssetGroup;
+    
+        // /**
+        //  * 加载单个资源 - 简化写法，固定caller=this
+        //  * @param url 资源url
+        //  * @param type 资源类型
+        //  * @param onComplete 完成回调 - 不代表加载成功
+        //  * @param args 透传参数
+        //  * @param onProgress 进度回调
+        //  */
+        // Load<T>(url:string,type?:string,
+        //     onComplete?:(url:string,res:T,args?:any)=>void,args?:any,onProgress?:(url:string,progress:number)=>void):void;
+        // Load(url:string,type?:string,
+        //     onComplete?:(url:string,res:any,args?:any)=>void,args?:any,onProgress?:(url:string,progress:number)=>void):void
+        // {
+        //     if (!this._assetGroup)
+        //         this._assetGroup = AssetGroup.Get();
+        //     this._assetGroup.Load(url,type,this,onComplete,args,onProgress);
+        // }
+    
+        // /**
+        //  * 加载一组资源 - 简化写法，固定caller=this
+        //  * @param urls 资源urls
+        //  * @param onComplete 完成回调 - 不代表加载成功
+        //  * @param args 透传参数
+        //  * @param onProgress 进度回调
+        //  * @return 返回groupID - -1表示无效的groupID，不需要加载直接返回
+        //  */
+        // public LoadGroup(urls:Array<{url:string,type?:string}> | Record<string,{type:string}>,
+        //     onComplete?:(group:AssetGroup,args?:any)=>void,args?:any,onProgress?:(progress:number)=>void):number
+        // {
+        //     if (!this._assetGroup)
+        //         this._assetGroup = AssetGroup.Get();
+        //     return this._assetGroup.LoadGroup(urls,this,onComplete,args,onProgress);
+        // }
+    
+        // /**
+        //  * 通过 URL 和类型获取资源。
+        //  * @param url 资源的 URL。
+        //  * @param type 资源的类型。
+        //  * @returns 资源。
+        //  */
+        // GetRes<T>(url:string,type?:string):T;
+        // GetRes(url:string,type?:string):any
+        // {
+        //     if (this._assetGroup)
+        //         return this._assetGroup.GetRes(url,type);
+        //     return ILaya.loader.getRes(url,type);
+        // }
+    
+        // /**
+        //  * 通过 URL 和类型判断资源是否已存在。
+        //  * @param url 资源的 URL。
+        //  * @param type 资源的类型。
+        //  */
+        // public HasRes(url:string,type?:string):boolean
+        // {
+        //     let res = this.GetRes(url,type);
+        //     return res ? true : false;
+        // }
+    
+        // /**
+        //  * 取消所有的资源加载 - 移除所有未加载完的资源的回调事件
+        //  * @param isRelease 是否同时释放资源 - false表示只是不再接收加载回调，其资源计数还在
+        //  */
+        // CancelAllAssets(isRelease:boolean):void
+        // {
+        //     if (this._assetGroup)
+        //         this._assetGroup.CancelAllAssets(isRelease);
+        // }
+    
+        // /**
+        //  * 取消单个资源加载 - 移除单个未加载完的资源的回调事件
+        //  * @param isRelease 是否同时释放资源 - false表示只是不再接收加载回调，其资源计数还在
+        //  */
+        // CancelAsset(url:string,caller:any,onComplete:(url:string,res:any,args?:any)=>void,onProgress:(url:string,progress:number)=>void,isRelease:boolean):void
+        // {
+        //     if (this._assetGroup)
+        //         this._assetGroup.CancelAsset(url,caller,onComplete,onProgress,isRelease);
+        // }
+//#endregion 资源加载相关
+    
+    
+//#region 长按事件相关
+    
+        /**长按事件类型 */
+        private static LONG_PRESS_EVENT:string = "LONG_PRESS_EVENT";
+        /**长按事件触发时间 */
+        private static LONG_PRESS_TIME_EVENT:number = 500;
+    
+        /**是否已注册长按事件 */
+        private isRegisterLongPressed:boolean;
+        /**是否已触发长按事件 */
+        private isTriggerLongPressed:boolean;
+        /**是否已启用长按定时器 */
+        private isLongPressTimer:boolean;
+    
+        /**
+         * @zh 为小部件注册一个长按事件监听器。
+         * @param listener 当长按事件发生时要调用的函数。
+         */
+        onLongPress(listener: Function): void;
+        /**
+         * @zh 为小部件注册一个长按事件监听器。
+         * @param caller 监听器函数将被调用的上下文。
+         * @param listener 当长按事件发生时要调用的函数。
+         * @param args 可选。一个数组，包含在事件触发时要传递给监听器函数的参数。
+         */
+        onLongPress(caller: any, listener: Function, args?: any[]): void;
+        onLongPress(caller: any, listener?: Function, args?: any[]): void {
+            if (arguments.length == 1) {
+                listener = caller;
+                caller = null;
+            }
+            this.on(Sprite.LONG_PRESS_EVENT, caller, listener, args);
+            
+            //注册长按相关事件
+            if (!this.isRegisterLongPressed)
+            {
+                this.isRegisterLongPressed = true;
+                this.on(Event.MOUSE_DOWN,this,this._onLongPressDown);
+                this.on(Event.MOUSE_UP,this,this._onLongPressUp);
+                this.on(Event.ROLL_OUT,this,this._onLongPressOver);
+            }
+        }
+    
+        /**
+         * @zh 为小部件取消注册一个长按事件监听器。
+         * @param listener 处理长按事件的函数。
+         */
+        offLongPress(listener: Function): void;
+        /**
+         * @zh 为小部件取消注册一个长按事件监听器。
+         * @param caller 监听器函数被调用的上下文。
+         * @param listener 处理长按事件的函数。
+         */
+        offLongPress(caller: any, listener: Function): void;
+        offLongPress(caller: any, listener?: Function): void {
+            if (arguments.length == 1) {
+                listener = caller;
+                caller = null;
+            }
+            this.off(Sprite.LONG_PRESS_EVENT, caller, listener);
+    
+            //取消长按事件后 - 若再无长按事件，则移除相关事件
+            if (!this.hasListener(Sprite.LONG_PRESS_EVENT))
+            {
+                if (this.isRegisterLongPressed)
+                {
+                    this.isRegisterLongPressed = false;
+                    this.off(Event.MOUSE_DOWN,this,this._onLongPressDown);
+                    this.off(Event.MOUSE_UP,this,this._onLongPressUp);
+                    this.off(Event.ROLL_OUT,this,this._onLongPressOver);
+                }
+            }
+        }
+    
+        //长按 - 按下
+        private _onLongPressDown():void
+        {
+            this.isTriggerLongPressed = false;
+            this._startLongPressTimer();
+        }
+        //长按 - 弹起
+        private _onLongPressUp():void
+        {
+            this._clearLongPressTimer();
+        }
+        //长按 - 移出
+        private _onLongPressOver():void
+        {
+            this._clearLongPressTimer();
+        }
+        //长按 - 触发
+        private _onLongPress():void
+        {
+            this.isLongPressTimer = false;
+            this.isTriggerLongPressed = true;
+            super.event(Sprite.LONG_PRESS_EVENT);
+        }
+    
+        private _startLongPressTimer():void
+        {
+            if (!this.isLongPressTimer)
+            {
+                this.isLongPressTimer = true;
+                this.timerOnce(Sprite.LONG_PRESS_TIME_EVENT, this, this._onLongPress, null, true);
+            }
+        }
+        private _clearLongPressTimer():void
+        {
+            if (this.isLongPressTimer)
+            {
+                this.isLongPressTimer = false;
+                this.clearTimer(this, this._onLongPress);
+            }
+        }
+    
+        event(type: string, data?: any): boolean {
+            // caochangli - 拦截触发的点击事件 - 如果已触发长按事件则不触发点击事件
+            if (this.isTriggerLongPressed && type === Event.CLICK)
+            {
+                this.isTriggerLongPressed = false;
+                return false;
+            }
+            return super.event(type, data);
+        }
+//#endregion 长按事件相关
+        
+        /**真实宽度 - 综合计算宽度*自身以及父节点的父节点的...缩放值 - caochangli */
+        get realWidth(): number {
+            let width:number = this._width * this._scaleX;
+            let globalNode = ILaya.stage;
+            let ele:Sprite = this.parent;
+            while (ele && !ele._destroyed)
+            {
+                width = width * ele._scaleX;
+                if (ele == globalNode) break;
+                ele = ele.parent;
+            }
+            return width;
+        }
+
+        /**真实高度 - 综合计算高度*自身以及父节点的父节点的...缩放值 - caochangli */
+        get realHeight(): number {
+            let height:number = this._height * this._scaleY;
+            let globalNode = ILaya.stage;
+            let ele:Sprite = this.parent;
+            while (ele && !ele._destroyed)
+            {
+                height = height * ele._scaleY;
+                if (ele == globalNode) break;
+                ele = ele.parent;
+            }
+            return height;
+        }
+    
+//#endregion
 }
 
 const tmpRect = new Rectangle();

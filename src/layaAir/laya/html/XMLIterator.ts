@@ -115,7 +115,12 @@ export class XMLIterator {
      * @param lowerCaseName 可选。是否将标签名称转换为小写。
      */
     public static begin(source: string, lowerCaseName?: boolean) {
-        XMLIterator.source = source;
+        // XMLIterator.source = source;
+        //caochangli - \n转换成<br>
+        let tempSource = source.replace(/\\n/g, '<br>');
+        // tempSource = tempSource.replace(/\n/g, '<br>');
+        XMLIterator.source = tempSource;
+        //caochangli - \n转换成<br>
         XMLIterator.lowerCaseName = lowerCaseName;
         this.sourceLen = source.length;
         this.parsePos = 0;

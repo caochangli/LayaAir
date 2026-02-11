@@ -1,6 +1,7 @@
 import { LayaEnv } from "../../LayaEnv";
 import { ILaya } from "../../ILaya";
 import { EventDispatcher } from "../events/EventDispatcher";
+import { AssetSystem, IAssetSystem } from "../sgsExpand/loader/AssetSystem";
 
 var _idCounter: number = 0;
 var _disposingCounter: number = 0;
@@ -206,6 +207,9 @@ export class Resource extends EventDispatcher {
         return this._referenceCount;
     }
 
+    //caochangli - 业务层资源管理器
+    _assetSystem:IAssetSystem;
+
     /**
      * @en Creates an instance of Resource.
      * @param managed If set to true, the resource will be automatically released when the reference count is 0. Default is true.
@@ -224,6 +228,8 @@ export class Resource extends EventDispatcher {
         this.destroyedImmediately = true;
         this._deps = [];
         this._traceDeps = false;
+
+        this._assetSystem = AssetSystem.Ins;
     }
 
     /**
@@ -296,7 +302,9 @@ export class Resource extends EventDispatcher {
         this._referenceCount -= count;
         //如果_removeReference发生在destroy中，可能是在collect或者处理内嵌资源的释放
         if (_disposingCounter > 0 && this._referenceCount <= 0 && !this.lock && this.destroyedImmediately) {
-            this.destroy();
+            //caochangli - 加上业务层的引用计数判断
+            if (!this._assetSystem || this._assetSystem.GetReference(this.url) <= 0)
+                this.destroy();
         }
     }
 
@@ -317,6 +325,11 @@ export class Resource extends EventDispatcher {
             res._addReference();
             this._deps.push(res);
 
+            //caochangli - 走业务层资源管理器
+            if (this._assetSystem && res.url)
+                this._assetSystem.AddReference(res.url);
+            //caochangli - 走业务层资源管理器
+
             if (!LayaEnv.isPlaying && res._traceDeps)
                 res.on("obsolute", this, this.onDepObsolute);
         }
@@ -331,6 +344,11 @@ export class Resource extends EventDispatcher {
             if (res instanceof Resource) {
                 res._addReference();
                 this._deps.push(res);
+
+                //caochangli - 走业务层资源管理器
+                if (this._assetSystem && res.url)
+                    this._assetSystem.AddReference(res.url);
+                //caochangli - 走业务层资源管理器
 
                 if (!LayaEnv.isPlaying && res._traceDeps)
                     res.on("obsolute", this, this.onDepObsolute);
@@ -360,6 +378,11 @@ export class Resource extends EventDispatcher {
         for (let res of this._deps) {
             res._removeReference();
 
+            //caochangli - 走业务层资源管理器
+            if (this._assetSystem && res.url)
+                this._assetSystem.DelReference(res.url);
+            //caochangli - 走业务层资源管理器
+
             if (!LayaEnv.isPlaying && res._traceDeps)
                 res.off("obsolute", this, this.onDepObsolute);
         }
@@ -371,5 +394,7 @@ export class Resource extends EventDispatcher {
                 console.debug(`destroy ${Object.getPrototypeOf(this).constructor.name} ${this.url}`);
             ILaya.loader.clearRes(this.url, this);
         }
+
+        this._assetSystem = null;
     }
 }

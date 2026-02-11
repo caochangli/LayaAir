@@ -91,24 +91,24 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
     protected _state: spine.AnimationState;
     protected _stateData: spine.AnimationStateData;
     protected _currentPlayTime: number = 0;
-    private _pause: boolean = true;
+    protected _pause: boolean = true;
     private _needUpdate: boolean = false;
     /** 动画播放的起始时间位置*/
-    private _playStart: number;
+    protected _playStart: number;
     /** 动画播放的结束时间位置*/
-    private _playEnd: number;
+    protected _playEnd: number;
     /** 动画的总时间*/
-    private _duration: number;
+    protected _duration: number;
     /** 播放速率*/
-    private _playbackRate: number = 1.0;
-    private _playAudio: boolean = true;
+    protected _playbackRate: number = 1.0;
+    protected _playAudio: boolean = true;
     private _soundChannelArr: any[] = [];
     // 播放轨道索引
     private trackIndex: number = 0;
 
     private _skinName: string = "default";
-    private _animationName: string;
-    private _loop: boolean = true;
+    protected _animationName: string;
+    protected _loop: boolean = true;
 
     private _externalSkins: ExternalSkin[];
     private _skin: string;
@@ -251,8 +251,9 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
 
     set animationName(value: string) {
         this._animationName = value;
-        if (this._templet && this._animationName)
-            this.play(value, this._loop, true);
+        // caochangli - 序列化时预制中设置的值 和 onEnable 重复执行play，换到SSpine2DRenderNode.onAfterDeserialize中实现序列化完成自动播放功能
+        // if (this._templet && this._animationName)
+        //     this.play(value, this._loop, true);
     }
 
     /**
@@ -277,8 +278,9 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
 
     set loop(value: boolean) {
         this._loop = value;
-        if (this._templet)
-            this.play(this._animationName, this._loop, true);
+        // caochangli - 业务没有这个需求或去规避这种逻辑
+        // if (this._templet)
+        //     this.play(this._animationName, this._loop, true);
     }
 
 
@@ -372,7 +374,8 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
         } else {
             this.changeNormal();
         }
-        this.play(this._animationName, this._loop, true, this._currentPlayTime);
+        // caochangli - 业务没有这个需求或去规避这种逻辑
+        // this.play(this._animationName, this._loop, true, this._currentPlayTime);
     }
 
     get offset(): Vector2 {
@@ -431,10 +434,13 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
         // this._offset.setValue(this.owner.pivotX, this.owner.pivotY);
         // this._renderHandle.offset = this._offset;
         this.owner.on(Event.TRANSFORM_CHANGED, this, this.onTransformChanged);
-        if (this._skeleton) {
-            if (LayaEnv.isPlaying && this._animationName !== undefined && this._animationName !== null)
-                this.play(this._animationName, this._loop, true);
-        }
+        // caochangli - 
+        // 1. 序列化时 和 onEnable 重复执行play，换到SSpine2DRenderNode.onAfterDeserialize中实现序列化完成自动播放功能 
+        // 2. onEnable就重新播放吗？
+        // if (this._skeleton) {
+        //     if (LayaEnv.isPlaying && this._animationName !== undefined && this._animationName !== null)
+        //         this.play(this._animationName, this._loop, true);
+        // }
     }
 
     /** @ignore @blueprintIgnore */
@@ -544,13 +550,10 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
         this._flushExtSkin();
         this.owner.event(Event.READY);
 
-        if (
-            LayaEnv.isPlaying
-            && this.enabled
-            && this._animationName !== undefined
-        ) {
-            this.play(this._animationName, this._loop, true);
-        }
+        // caochangli - 去掉此功能，SSpine2DRenderNode中实现加载完播放功能
+        // if (LayaEnv.isPlaying && this.enabled && this._animationName !== undefined) {
+        //     this.play(this._animationName, this._loop, true);
+        // }
     }
 
     /**
@@ -572,6 +575,10 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
      * @param playAudio		Whether to play audio.
      */
     play(nameOrIndex: string | number, loop: boolean, force: boolean = true, start: number = 0, end: number = 0, freshSkin: boolean = true, playAudio: boolean = true) {
+        // caochangli - 容错
+        if (!this._templet || this.destroyed)
+            return;
+        // caochangli - 容错
         this._playAudio = playAudio;
         start /= 1000;
         end /= 1000;

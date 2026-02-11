@@ -32,6 +32,10 @@ import { StretchParam } from "./StretchParam";
 import { TranslationsLoader } from "./TranslationLoader";
 import { GMovieClip } from "./GMovieClip";
 import { Selection } from "./selection/Selection";
+// import { SButton } from "./sgsExpand/SButton";
+// import { SComboBox } from "./sgsExpand/SComboBox";
+// import { SList } from "./sgsExpand/SList";
+// import { STabButtonGroup } from "./sgsExpand/STabButtonGroup";
 
 let r = ClassUtils.regClass;
 r("GWidget", GWidget);
@@ -68,6 +72,14 @@ r("Selection", Selection);
 r("Scroller", Scroller);
 r("Layout", Layout);
 r("StretchParam", StretchParam);
+
+// caochangli - 注册新增类
+// r("SButton", SButton);
+// r("SList", SList);
+// r("SComboBox", SComboBox);
+// r("STabButtonGroup", STabButtonGroup);
+// caochangli - 注册新增类
+
 r("ItemData", class extends Object { });
 
 Loader.registerLoader(["i18ns"], TranslationsLoader);

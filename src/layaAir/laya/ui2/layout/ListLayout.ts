@@ -2,13 +2,14 @@ import { ILaya } from "../../../ILaya";
 import { Point } from "../../maths/Point";
 import { Rectangle } from "../../maths/Rectangle";
 import { GButton } from "../GButton";
-import { LayoutChangedReason, LayoutType, StretchMode } from "../Const";
+import { LayoutChangedReason, LayoutType, ScrollDirection, StretchMode } from "../Const";
 import type { GList } from "../GList";
 import { UIConfig2 } from "../UIConfig";
 import type { GWidget } from "../GWidget";
 import { Layout } from "./Layout";
 import { UIEvent } from "../UIEvent";
 import { Sprite } from "../../display/Sprite";
+import { GBox } from "../GBox";
 
 export class ListLayout extends Layout {
     declare _owner: GList;
@@ -29,6 +30,15 @@ export class ListLayout extends Layout {
     private _itemSizes: Array<number>;
     private _offsetX: number;
     private _offsetY: number;
+
+    // constructor(owner: GBox)
+    // {
+    //     super(owner);
+
+    //     // caochangli - 实体列表也监听滚动事件，实现不在可视区域的item不显示
+    //     // 实体列表不在可视区域的item不显示逻辑暂时屏蔽
+    //     // this._owner.on(UIEvent.Scroll, this, this._entityScrolled);
+    // }
 
     get numItems(): number {
         if (this._virtual)
@@ -88,6 +98,10 @@ export class ListLayout extends Layout {
                 for (let i = 0; i < value; i++)
                     this._owner.itemRenderer(i, this._owner.getChildAt(i));
             }
+
+            // 立即刷新
+            // 实体列表不在可视区域的item不显示逻辑暂时屏蔽
+            // this._refreshEntityList(false);
         }
     }
 
@@ -111,6 +125,10 @@ export class ListLayout extends Layout {
     _setVirtual(loop: boolean): void {
         if (this._virtual)
             return;
+
+        // caochangli - 虚拟列表移除实体列表滚动事件
+        // 实体列表不在可视区域的item不显示逻辑暂时屏蔽
+        // this._owner.off(UIEvent.Scroll, this, this._entityScrolled);
 
         this._virtual = true;
         this._loop = loop;
@@ -653,8 +671,9 @@ export class ListLayout extends Layout {
                 }
 
                 if (ii.obj && ii.obj.url != url) {
-                    if (ii.obj instanceof GButton)
-                        ii.selected = ii.obj.selected;
+                    // caochangli - 不需要了
+                    // if (ii.obj instanceof GButton)
+                    //     ii.selected = ii.obj.selected;
                     this._owner.removeChildToPool(ii.obj);
                     ii.obj = null;
                 }
@@ -666,8 +685,9 @@ export class ListLayout extends Layout {
                     for (let j = reuseIndex; j >= oldFirstIndex; j--) {
                         let ii2 = this._items[j];
                         if (ii2.obj && ii2.flag !== this._itemInfoVer && ii2.obj.url == url) {
-                            if (ii2.obj instanceof GButton)
-                                ii2.selected = ii2.obj.selected;
+                            // caochangli - 不需要了
+                            // if (ii2.obj instanceof GButton)
+                            //     ii2.selected = ii2.obj.selected;
                             ii.obj = ii2.obj;
                             ii2.obj = null;
                             if (j === reuseIndex)
@@ -680,8 +700,9 @@ export class ListLayout extends Layout {
                     for (let j = reuseIndex; j <= lastIndex; j++) {
                         let ii2 = this._items[j];
                         if (ii2.obj && ii2.flag !== this._itemInfoVer && ii2.obj.url == url) {
-                            if (ii2.obj instanceof GButton)
-                                ii2.selected = ii2.obj.selected;
+                            // caochangli - 不需要了
+                            // if (ii2.obj instanceof GButton)
+                            //     ii2.selected = ii2.obj.selected;
                             ii.obj = ii2.obj;
                             ii2.obj = null;
                             if (j === reuseIndex)
@@ -695,7 +716,8 @@ export class ListLayout extends Layout {
                     this._owner.setChildIndex(ii.obj, forward ? curIndex - newFirstIndex : this._owner.numChildren);
                 }
                 else {
-                    ii.obj = pool.take(url);
+                    // caochangli - 改从getFromPool接口获取，主要获取时设置visible=true
+                    ii.obj = this._owner.getFromPool(url);//pool.take(url);
                     if (forward)
                         this._owner.addChildAt(ii.obj, curIndex - newFirstIndex);
                     else
@@ -745,8 +767,9 @@ export class ListLayout extends Layout {
         for (let i = 0; i < childCount; i++) {
             let ii = this._items[oldFirstIndex + i];
             if (ii.flag !== this._itemInfoVer && ii.obj) {
-                if (ii.obj instanceof GButton)
-                    ii.selected = ii.obj.selected;
+                // caochangli - 不需要了
+                // if (ii.obj instanceof GButton)
+                //     ii.selected = ii.obj.selected;
                 this._owner.removeChildToPool(ii.obj);
                 ii.obj = null;
             }
@@ -833,8 +856,9 @@ export class ListLayout extends Layout {
                 }
 
                 if (ii.obj && ii.obj.url != url) {
-                    if (ii.obj instanceof GButton)
-                        ii.selected = ii.obj.selected;
+                    // caochangli - 不需要了
+                    // if (ii.obj instanceof GButton)
+                    //     ii.selected = ii.obj.selected;
                     this._owner.removeChildToPool(ii.obj);
                     ii.obj = null;
                 }
@@ -845,8 +869,9 @@ export class ListLayout extends Layout {
                     for (let j = reuseIndex; j >= oldFirstIndex; j--) {
                         let ii2 = this._items[j];
                         if (ii2.obj && ii2.flag !== this._itemInfoVer && ii2.obj.url == url) {
-                            if (ii2.obj instanceof GButton)
-                                ii2.selected = ii2.obj.selected;
+                            // caochangli - 不需要了
+                            // if (ii2.obj instanceof GButton)
+                            //     ii2.selected = ii2.obj.selected;
                             ii.obj = ii2.obj;
                             ii2.obj = null;
                             if (j === reuseIndex)
@@ -859,8 +884,9 @@ export class ListLayout extends Layout {
                     for (let j = reuseIndex; j <= lastIndex; j++) {
                         let ii2 = this._items[j];
                         if (ii2.obj && ii2.flag !== this._itemInfoVer && ii2.obj.url == url) {
-                            if (ii2.obj instanceof GButton)
-                                ii2.selected = ii2.obj.selected;
+                            // caochangli - 不需要了
+                            // if (ii2.obj instanceof GButton)
+                            //     ii2.selected = ii2.obj.selected;
                             ii.obj = ii2.obj;
                             ii2.obj = null;
                             if (j === reuseIndex)
@@ -874,7 +900,8 @@ export class ListLayout extends Layout {
                     this._owner.setChildIndex(ii.obj, forward ? curIndex - newFirstIndex : this._owner.numChildren);
                 }
                 else {
-                    ii.obj = pool.take(url);
+                    // caochangli - 改从getFromPool接口获取，主要获取时设置visible=true
+                    ii.obj = this._owner.getFromPool(url);//pool.take(url);
                     if (forward)
                         this._owner.addChildAt(ii.obj, curIndex - newFirstIndex);
                     else
@@ -924,8 +951,9 @@ export class ListLayout extends Layout {
         for (let i = 0; i < childCount; i++) {
             let ii = this._items[oldFirstIndex + i];
             if (ii.flag !== this._itemInfoVer && ii.obj) {
-                if (ii.obj instanceof GButton)
-                    ii.selected = ii.obj.selected;
+                // caochangli - 不需要了
+                // if (ii.obj instanceof GButton)
+                //     ii.selected = ii.obj.selected;
                 this._owner.removeChildToPool(ii.obj);
                 ii.obj = null;
             }
@@ -1019,8 +1047,9 @@ export class ListLayout extends Layout {
                 while (reuseIndex < virtualItemCount) {
                     let ii2 = this._items[reuseIndex];
                     if (ii2.obj && ii2.flag !== this._itemInfoVer) {
-                        if (ii2.obj instanceof GButton)
-                            ii2.selected = ii2.obj.selected;
+                        // caochangli - 不需要了
+                        // if (ii2.obj instanceof GButton)
+                        //     ii2.selected = ii2.obj.selected;
                         ii.obj = ii2.obj;
                         ii2.obj = null;
                         break;
@@ -1038,7 +1067,8 @@ export class ListLayout extends Layout {
                             url = pool.defaultRes.url;
                     }
 
-                    ii.obj = pool.take(url);
+                    // caochangli - 改从getFromPool接口获取，主要获取时设置visible=true
+                    ii.obj = this._owner.getFromPool(url);//pool.take(url);
                     this._owner.addChildAt(ii.obj, insertIndex);
                 }
                 else {
@@ -1103,8 +1133,9 @@ export class ListLayout extends Layout {
         for (let i = reuseIndex; i < virtualItemCount; i++) {
             let ii = this._items[i];
             if (ii.flag !== this._itemInfoVer && ii.obj) {
-                if (ii.obj instanceof GButton)
-                    ii.selected = ii.obj.selected;
+                // caochangli - 不需要了
+                // if (ii.obj instanceof GButton)
+                //     ii.selected = ii.obj.selected;
                 this._owner.removeChildToPool(ii.obj);
                 ii.obj = null;
             }
@@ -1184,8 +1215,9 @@ export class ListLayout extends Layout {
                 while (reuseIndex < virtualItemCount) {
                     let ii2 = this._items[reuseIndex];
                     if (ii2.obj && ii2.flag !== this._itemInfoVer) {
-                        if (ii2.obj instanceof GButton)
-                            ii2.selected = ii2.obj.selected;
+                        // caochangli - 不需要了
+                        // if (ii2.obj instanceof GButton)
+                        //     ii2.selected = ii2.obj.selected;
                         ii.obj = ii2.obj;
                         ii2.obj = null;
                         break;
@@ -1203,7 +1235,8 @@ export class ListLayout extends Layout {
                             url = pool.defaultRes.url;
                     }
 
-                    ii.obj = pool.take(url);
+                    // caochangli - 改从getFromPool接口获取，主要获取时设置visible=true
+                    ii.obj = this._owner.getFromPool(url);//pool.take(url);
                     this._owner.addChildAt(ii.obj, insertIndex);
                 }
                 else {
@@ -1268,13 +1301,112 @@ export class ListLayout extends Layout {
         for (let i = reuseIndex; i < virtualItemCount; i++) {
             let ii = this._items[i];
             if (ii.flag !== this._itemInfoVer && ii.obj) {
-                if (ii.obj instanceof GButton)
-                    ii.selected = ii.obj.selected;
+                // caochangli - 不需要了
+                // if (ii.obj instanceof GButton)
+                //     ii.selected = ii.obj.selected;
                 this._owner.removeChildToPool(ii.obj);
                 ii.obj = null;
             }
         }
     }
+
+
+//#region caochangli - 功能扩展:实体列表不在可视区域不显示 
+
+    private _entityChanged:boolean;
+    private _entityScrolled() {
+        if (this._virtual || !this._owner.scroller) 
+            return;
+ 
+        if (!this._entityChanged)
+        {
+            this._entityChanged = true;
+            ILaya.timer.callLater(this, this._refreshEntityList);
+        }
+    }
+
+    private _refreshEntityList(forceShow:boolean):void
+    {
+        // 有BUG，比如：直接设置滚动到指定位置时scrollTo(50);
+        // 之前这个位置的child.visible=false，当下列逻辑设置visible=true后也看不见
+        // 后来发现通过(this._owner._$container as any)._transChanged(1);就可以看的见了，但要延迟执行
+        // 感觉是裁剪导致的
+
+        this._entityChanged = false;
+        if (!this._owner || this._owner.destroyed)
+            return;
+
+        let scroller = this._owner.scroller;
+        if (!scroller) 
+            return;
+
+        let scrollWidth = this._owner.width - this.padding[1] - this.padding[3];
+        let scrollHeight = this._owner.height - this.padding[0] - this.padding[2];
+        let scrollPosX = scroller.scrollingPosX;
+        let scrollPosY = scroller.scrollingPosY;
+        let children = this._owner.children;
+        let len = children.length;
+        let child;
+        
+        if (forceShow)
+        {
+            for (let i = 0; i < len; i++)
+            {
+                child = <GWidget>children[i];
+                child.visible = true;
+            }
+            return;
+        }
+        if (scroller.direction == ScrollDirection.Vertical)
+        {
+            for (let i = 0; i < len; i++)
+            {
+                child = <GWidget>children[i];
+                if (child.y + child.height >= scrollPosY && child.y <= scrollPosY + scrollHeight)
+                    child.visible = true;
+                else
+                    child.visible = false;
+            }
+        }
+        else if (scroller.direction == ScrollDirection.Horizontal)
+        {
+            for (let i = 0; i < len; i++)
+            {
+                child = <GWidget>children[i];
+                if (child.x + child.width >= scrollPosX && child.x <= scrollPosX + scrollWidth)
+                    child.visible = true;
+                else
+                    child.visible = false;
+            }
+        }
+        else if (scroller.direction == ScrollDirection.Both)
+        {
+            for (let i = 0; i < len; i++)
+            {
+                child = <GWidget>children[i];
+                if ((child.x + child.width >= scrollPosX && child.x <= scrollPosX + scrollWidth) ||
+                    (child.y + child.height >= scrollPosY && child.y <= scrollPosY + scrollHeight))
+                    child.visible = true;
+                else
+                    child.visible = false;
+            }
+        }
+
+        //尝试解决 - 不显示问题
+        if (!this._entityTransChanged)
+        {
+            this._entityTransChanged = true;
+            ILaya.timer.frameOnce(2,this, this._refreshEntityTransChanged);
+        }
+    }
+    private _entityTransChanged:boolean;
+    private _refreshEntityTransChanged() {
+        this._entityTransChanged = false;
+        if (!this._owner || this._owner.destroyed)
+            return;
+        (this._owner._$container as any)._transChanged(1);
+    }
+//#endregion
 }
 
 interface ItemInfo {

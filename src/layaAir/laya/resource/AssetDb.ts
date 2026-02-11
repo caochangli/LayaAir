@@ -96,6 +96,23 @@ export class AssetDb {
         }
     }
 
+    /** 
+     * UUID -> URL 如果传入的就是URL则直接返回 (caochangli)
+     * @param uuid 
+     * @param onCallBack
+     */
+    uuidToUrl(uuid: string, onCallBack: (uuid: string,url: string) => void) {
+        if (!uuid || !onCallBack) return;
+        if (uuid.startsWith("res://")) {
+            AssetDb.inst.UUID_to_URL_async(uuid.substring(6)).then(url => {
+                onCallBack(uuid,url);
+            });
+        }
+        else {
+            onCallBack(uuid,uuid);
+        }
+    }
+
     /**
      * @en Finds the URL for a shader name.
      * @param shaderName The shader name.

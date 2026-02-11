@@ -7,6 +7,10 @@ import { Texture } from "../resource/Texture";
 import { GWidget } from "./GWidget";
 import { ImageRenderer } from "./ImageRenderer";
 import { IMeshFactory } from "../display/mesh/MeshFactory";
+import { AssetDb } from "../resource/AssetDb";
+import { AssetGroup, IAssetGroup } from "../sgsExpand/loader/AssetGroup";
+import { AtlasResource } from "../resource/AtlasResource";
+import { LayaEnv } from "../../LayaEnv";
 
 /**
  * @en GImage is a widget that displays an image resource.
@@ -21,6 +25,9 @@ export class GImage extends GWidget {
 
     private _renderer: ImageRenderer;
 
+    // caochangli - 是否是Button的Image
+    private _isBtnImage:boolean;
+
     constructor() {
         super();
 
@@ -28,6 +35,18 @@ export class GImage extends GWidget {
         this._autoSize = true;
         this._renderer = new ImageRenderer(this);
         this._renderer._onReload = () => this.onTextureReload();
+    }
+
+    //caochangli - 通过onAfterDeserialize接口处理预制序列化完成后的逻辑
+    onAfterDeserialize() {
+        super.onAfterDeserialize();
+        if (this._autoSize) {
+            if (this._renderer._tex)
+                this.size(this._renderer._tex.sourceWidth, this._renderer._tex.sourceHeight);
+            else if (!this._getBit(NodeFlags.EDITING_NODE))
+                this.size(0, 0);
+            this._autoSize = true;
+        }
     }
 
     /**
@@ -38,6 +57,9 @@ export class GImage extends GWidget {
         return this._src;
     }
 
+    /**
+     * 只能加载单图 - 如果传入的是还未加载的图集散图，则无法加载成功(如果图集已经加载过了，倒是可以)。
+     */
     set src(value: string) {
         if (value == null)
             value = "";
@@ -46,16 +68,124 @@ export class GImage extends GWidget {
 
         this._src = value;
         let loadID = ++this._loadId;
-        if (value) {
-            //在反序列化时，禁止立刻设置texture，因为autoSize值还没反序列化
-            let tex = SerializeUtil.isDeserializing ? null : Loader.getRes(value);
+        // if (value) {
+        //     //在反序列化时，禁止立刻设置texture，因为autoSize值还没反序列化
+        //     let tex = SerializeUtil.isDeserializing ? null : Loader.getRes(value);
+        //     if (tex)
+        //         this.onLoaded(tex, loadID);
+        //     else
+        //         ILaya.loader.load(value, Loader.IMAGE).then(res => this.onLoaded(res, loadID));
+        // }
+        // else
+        //     this.onLoaded(null, loadID);
+
+        //caochangli - 走业务层资源管理器
+        this._loadSrcImage(loadID);
+    }
+
+    //caochangli - 走业务层资源管理器
+    private _srcAssetGroup:IAssetGroup;
+    private _loadSrcImage(loadID:number) {
+
+        //空路径
+        if (!this._src)
+        {
+            // caochangli - button按钮换肤不需要取消加载
+            if (!this._isBtnImage)
+                this._cancelSrcLoad();
+            this.onLoaded(null, loadID);
+            return;
+        }
+
+        //本次需要的资源正在加载中 - 等待加载完成
+        if (this._srcAssetGroup && this._srcAssetGroup.IsResLoading(this._src))
+            return;
+
+        if (!this._srcAssetGroup)
+            this._srcAssetGroup = AssetGroup.Get();
+         // caochangli - button按钮换肤不需要取消加载
+        else if (!this._isBtnImage)
+            this._srcAssetGroup.CancelAllAssets(true);
+
+        //没有获取到AssetGroup - 走引擎原逻辑
+        if (!this._srcAssetGroup)
+        {
+            let tex = Loader.getRes(this._src);
             if (tex)
                 this.onLoaded(tex, loadID);
             else
-                ILaya.loader.load(value, Loader.IMAGE).then(res => this.onLoaded(res, loadID));
+                ILaya.loader.load(this._src, Loader.IMAGE).then(res => this.onLoaded(res, loadID));
+            return;
         }
-        else
-            this.onLoaded(null, loadID);
+
+        let tex:Texture = Loader.getRes(this._src);
+        if (!tex && LayaEnv.isPreview)
+        {
+            // 预览模式坑爹点，发布后没有uuid，全部用路径不存在此坑
+            // 即便图集已加载，首次getRes("res://***@***")还是获取不到资源，因为uuid和路径映射关系还没有，必须走一遍异步load加载才会建立映射关系
+            // 这就意味着即便预加载了图集，使用图集散图还是无法直接同步获取，只能走异步加载
+            let index = this._src.indexOf("@");
+            if (index >= 0 && this._src.startsWith("res://"))
+            {
+                let atlasUUID = this._src.substring(0,index);
+                let atlas:AtlasResource = Loader.getAtlas(atlasUUID);
+                if (atlas)
+                {
+                    let imgName = this._src.substring(index + 1);
+                    let imgUrl = `${atlas.dir}${imgName}.png`;
+                    tex = Loader.getRes(imgUrl);
+                    if (!tex)
+                    {
+                        imgUrl = `${atlas.dir}${imgName}.jpg`;
+                        tex = Loader.getRes(imgUrl);
+                    }
+                    if (tex)
+                    {
+                        let uuidMap = AssetDb.inst.uuidMap;
+                        let texUUID = `${atlasUUID.substring(6)}@${imgName}`;
+                        tex.uuid = texUUID;
+                        uuidMap[texUUID] = tex.url;
+                        uuidMap[tex.url] = texUUID;
+                    }
+                }
+            }
+        }
+        
+        if (tex && tex.url)
+        {   
+            //图集中小图 - 计数记到图集上
+            if (tex._atlas && tex._atlas.url)
+                this._srcAssetGroup.OnlyAddReference(tex._atlas.url);
+            else
+                this._srcAssetGroup.OnlyAddReference(tex.url,tex);
+            this.onLoaded(tex, loadID);
+        }
+        else//需要加载资源
+        {
+            //清空上一次纹理
+            this._renderer.setTexture(null);
+
+            //预览模式 - 将uuid转成url
+            if (LayaEnv.isPreview)
+            {
+                AssetDb.inst.uuidToUrl(this._src,(uuid:string,url:string)=>{
+                    if (!this.destroyed && this._src && this._src == uuid)
+                    {
+                        if (!url)
+                            this.onLoaded(null, loadID);
+                        else
+                            this._srcAssetGroup.Load(url,Loader.IMAGE,this,(url:string,res:Texture)=>{this.onLoaded(res, loadID)});
+                    }
+                });
+            }
+            //生产模式 - 没有uuid，都是用路径加载的
+            else
+                this._srcAssetGroup.Load(this._src,Loader.IMAGE,this,(url:string,res:Texture)=>{this.onLoaded(res, loadID)});
+        }
+    }
+    private _cancelSrcLoad() {
+        if (this._srcAssetGroup)
+            this._srcAssetGroup.CancelAllAssets(true);
     }
 
     /**
@@ -67,7 +197,12 @@ export class GImage extends GWidget {
     }
 
     set texture(value: Texture) {
-        this._src = "instance-0";
+        if (this._renderer._tex === value)
+            return;
+        this._src = value && value.url || "instance-0";
+        // caochangli - button按钮换肤不需要取消加载
+        if (!this._isBtnImage)
+            this._cancelSrcLoad();
         this.onLoaded(value, ++this._loadId);
     }
 
@@ -102,7 +237,8 @@ export class GImage extends GWidget {
 
     set autoSize(value: boolean) {
         if (this._autoSize != value) {
-            if (value && this._renderer._tex)
+            // caochangli - 序列化中暂不处理
+            if (value && this._renderer._tex && !SerializeUtil.isDeserializing)
                 this.size(this._renderer._tex.sourceWidth, this._renderer._tex.sourceHeight);
             this._autoSize = value; //放最后，因为size会改变autoSize的值
         }
@@ -127,7 +263,8 @@ export class GImage extends GWidget {
 
         this._renderer.setTexture(tex);
 
-        if (this._autoSize) {
+        // caochangli - 序列化中暂不处理
+        if (this._autoSize && !SerializeUtil.isDeserializing) {
             if (tex)
                 this.size(tex.sourceWidth, tex.sourceHeight);
             else if (!this._getBit(NodeFlags.EDITING_NODE))
@@ -139,7 +276,8 @@ export class GImage extends GWidget {
     }
 
     private onTextureReload() {
-        if (this._autoSize) {
+        // caochangli - 序列化中暂不处理
+        if (this._autoSize && !SerializeUtil.isDeserializing) {
             let tex = this._renderer._tex;
             this.size(tex.sourceWidth, tex.sourceHeight);
             this._autoSize = true;
@@ -160,6 +298,13 @@ export class GImage extends GWidget {
         super.destroy();
 
         this._renderer.destroy();
+
+        //回收使用src接口加载的资源
+        if (this._srcAssetGroup)
+        {
+            AssetGroup.Release(this._srcAssetGroup);
+            this._srcAssetGroup = null;
+        }
     }
 
     /** @internal @blueprintEvent */

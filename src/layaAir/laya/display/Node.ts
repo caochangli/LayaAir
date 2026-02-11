@@ -338,6 +338,10 @@ export class Node extends EventDispatcher {
         this.destroyAllComponent();
         this._parent && this._parent._removeChild(this);
 
+        // caochangli - 增加节点销毁事件
+        this.event(Event.DESTROY,this);
+        // caochangli - 增加节点销毁事件
+
         //销毁子节点，这里要用_children，所以不能用destroyChildren
         for (let i = 0, n = this._children.length; i < n; i++) {
             let node = this._children[0];
@@ -823,7 +827,8 @@ export class Node extends EventDispatcher {
         if (value) {
             this._parent = value;
             this._onAdded();
-            this.event(Event.ADDED);
+            // caochangli - 事件带上自己
+            this.event(Event.ADDED,this);
             if ((this._bits & NodeFlags.DISPLAY) !== 0) {
                 this._setBitUp(NodeFlags.DISPLAY);
                 if (value.displayedInStage)
@@ -832,7 +837,8 @@ export class Node extends EventDispatcher {
             value._childChanged(this);
         } else {
             this._onRemoved();
-            this.event(Event.REMOVED);
+            // caochangli - 事件带上自己
+            this.event(Event.REMOVED,this);
             let p = this._parent;
             if ((this._bits & NodeFlags.DISPLAY) !== 0)
                 this._displayChild(this, false);
@@ -1487,10 +1493,19 @@ export class Node extends EventDispatcher {
 
     /**
      * @en Called after deserialization.
-     * @zh 反序列化后调用。
+     * @zh 反序列化后调用。- 只代表自己和其子节点反序列化完成了（不代表父节点反序列化完成）
      * @blueprintIgnore
      */
     onAfterDeserialize() { }
+
+
+//#region caochangli - 扩展功能
+    
+    /**是否已触发过onAwake - caochangli */
+    get isAwaked():boolean {
+        return this._getBit(NodeFlags.AWAKED);
+    }
+//#endregion caochangli - 扩展功能
 }
 
 export interface INodeExtra { }

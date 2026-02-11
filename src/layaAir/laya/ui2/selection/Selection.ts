@@ -11,7 +11,21 @@ import { NodeFlags } from "../../Const";
 
 export class Selection implements ISelection {
     scrollItemToViewOnClick: boolean = false;
-    allowSelectByRightClick: boolean = true;
+    /**caochangli - 允许右键选中，默认值修改成false */
+    allowSelectByRightClick: boolean = false;
+
+    /**caochangli - 增加允许点击选中，默认false */
+    allowSelectedByClick:boolean = false;
+
+    /**caochangli - 增加选中记录 */
+    protected _selectedIndexs:Array<number>;
+    get selectedIndexs():Array<number>
+    {
+        return this._selectedIndexs;
+    }
+
+    /**是否使用改版选中逻辑 */
+    protected _useChangeSelected:boolean = true;
 
     protected _owner: GPanel;
     protected _mode: SelectionMode = 0;
@@ -33,7 +47,11 @@ export class Selection implements ISelection {
     }
 
     get index(): number {
-        return this._owner.children.findIndex(obj => (obj instanceof GButton) && obj.selected);
+        // caochangli - 换成selectedIndexs处理(更高效)
+        if (this._useChangeSelected)
+            return this._selectedIndexs && this._selectedIndexs.length ? this._selectedIndexs[0] : -1;
+
+        return this._owner.children.findIndex(obj => (obj instanceof GButton) && obj.selected);  
     }
 
     set index(value: number) {
@@ -62,6 +80,10 @@ export class Selection implements ISelection {
     }
 
     get(out?: number[]): number[] {
+        // caochangli - 换成selectedIndexs处理(更高效)
+        if (this._useChangeSelected)
+            return this._selectedIndexs;
+
         if (!out)
             out = [];
 
@@ -91,6 +113,9 @@ export class Selection implements ISelection {
         else
             obj = this._owner.getChildAt(index);
 
+        // caochangli - 添加选中索引
+        this._addSelectedIndex(index);
+
         if ((obj instanceof GButton) && !obj.selected)
             obj.selected = true;
 
@@ -107,25 +132,86 @@ export class Selection implements ISelection {
         else
             obj = this._owner.getChildAt(index);
 
-        if (obj instanceof GButton)
+        // caochangli - 删除选中索引
+        this._removeSelectedIndex(index);
+
+        if (obj instanceof GButton && obj.selected)
             obj.selected = false;
     }
 
     clear(): void {
+        // caochangli - 换成selectedIndexs处理(更高效)
+        if (this._useChangeSelected)
+        {
+            if (!this._selectedIndexs || this._selectedIndexs.length <= 0)
+                return;
+            let obj: GWidget;
+            for (let i = 0,length = this._selectedIndexs.length; i < length; i++)
+            {
+                obj = this._owner.getChildAt(this._selectedIndexs[i]);
+                if ((obj instanceof GButton) && obj.selected && !(<any>obj._extra).isTemplateNode)
+                    obj.selected = false;
+            }
+            this._selectedIndexs.length = 0;
+            return;
+        }
+
         for (let obj of this._owner.children) {
             if ((obj instanceof GButton) && !(<any>obj._extra).isTemplateNode)
                 obj.selected = false;
-        }
+        }                 
     }
 
-    protected clearExcept(g: GWidget): void {
+    protected clearExcept(g: GWidget,exceptIndex:number): void {
+        // caochangli - 换成selectedIndexs处理(更高效)
+        if (this._useChangeSelected)
+        {
+            if (!this._selectedIndexs || this._selectedIndexs.length <= 0)
+                return;
+            let obj: GWidget;
+            for (let length = this._selectedIndexs.length,i = length - 1; i >= 0; i--)
+            {
+                obj = this._owner.getChildAt(this._selectedIndexs[i]);
+                if (obj != g)
+                {
+                    if ((obj instanceof GButton) && obj.selected && !(<any>obj._extra).isTemplateNode)
+                        obj.selected = false;
+                    this._selectedIndexs.splice(i,1);
+                }
+            }
+            return;
+        }
+
         for (let obj of this._owner.children) {
             if ((obj instanceof GButton) && obj != g && !(<any>obj._extra).isTemplateNode)
                 obj.selected = false;
-        }
+        }        
     }
 
     selectAll(): void {
+        // caochangli - 更高效
+        if (this._useChangeSelected)
+        {
+            let children = this._owner.children;
+            let length = children.length;
+            if (length <= 0)
+                return;
+            if (!this._selectedIndexs)
+                this._selectedIndexs = [];
+            else
+                this._selectedIndexs.length = 0;
+            let obj;
+            for (let i = 0; i < length; i++)
+            {
+                obj = children[i];
+                if ((obj instanceof GButton) && !obj.selected) {
+                    obj.selected = true;
+                }
+                this._selectedIndexs.push(i);
+            }
+            return;
+        }
+
         for (let obj of this._owner.children) {
             if ((obj instanceof GButton) && !obj.selected) {
                 obj.selected = true;
@@ -134,6 +220,32 @@ export class Selection implements ISelection {
     }
 
     selectReverse(): void {
+        // caochangli - 更高效
+        if (this._useChangeSelected)
+        {
+            let children = this._owner.children;
+            let length = children.length;
+            if (length <= 0)
+                return;
+            if (!this._selectedIndexs)
+                this._selectedIndexs = [];
+            else
+                this._selectedIndexs.length = 0;
+            let obj;
+            let curSelected;
+            for (let i = 0; i < length; i++)
+            {
+                obj = children[i];
+                if ((obj instanceof GButton)) {
+                    curSelected = !obj.selected;
+                    obj.selected = curSelected;
+                    if (curSelected) 
+                        this._selectedIndexs.push(i);
+                }
+            }
+            return;
+        }
+        
         for (let obj of this._owner.children) {
             if (obj instanceof GButton) {
                 obj.selected = !obj.selected;
@@ -174,25 +286,34 @@ export class Selection implements ISelection {
         if (evt.button == 2 && !this.allowSelectByRightClick)
             return;
 
+        // caochangli - 不允许点击选中
+        if (evt.button == 0 && !this.allowSelectedByClick)
+            return;
+
         if (item.mode == ButtonMode.Common) {
             this._owner.event(UIEvent.ClickItem, [item, evt]);
             return;
         }
-
+ 
         let dontChangeLastIndex = false;
         let index = this._owner.getChildIndex(item);
 
         if (this._mode == SelectionMode.Disabled) {
             //nothing
         }
+        // caochangli - 单选：只能选中不能取消？- 给ComboBox用的？
         else if (this._mode == SelectionMode.Single) {
             if (!item.selected) {
-                this.clearExcept(item);
+                this.clearExcept(item,index);
+                // caochangli - 添加选中索引
+                this._addSelectedIndex(index);
                 item.selected = true;
                 item.event(Event.CHANGED);
             }
         }
+        // caochangli - 多选
         else {
+            // caochangli - 按住shift：只能选中不能取消？
             if (evt.shiftKey) {
                 if (!item.selected) {
                     if (this._lastIndex != -1) {
@@ -203,6 +324,8 @@ export class Selection implements ISelection {
                         for (let i = min; i <= max; i++) {
                             let obj = this._owner.getChildAt(i);
                             if (obj instanceof GButton) {
+                                // caochangli - 添加选中索引
+                                this._addSelectedIndex(i);
                                 obj.selected = true;
                                 if (obj == item)
                                     item.event(Event.CHANGED);
@@ -212,23 +335,37 @@ export class Selection implements ISelection {
                         dontChangeLastIndex = true;
                     }
                     else {
+                        // caochangli - 添加选中索引
+                        this._addSelectedIndex(index);
                         item.selected = true;
                         item.event(Event.CHANGED);
                     }
                 }
             }
+            // caochangli - 按住ctrl或meta或多选单击实现：可选中可取消
             else if ((evt.ctrlKey || evt.metaKey) || this._mode == SelectionMode.MultipleBySingleClick) {
-                item.selected = !item.selected;
+                // item.selected = !item.selected;
+                let curSelected = !item.selected;
+                item.selected = curSelected;
+                // caochangli - 添加、删除选中索引
+                if (curSelected)
+                    this._addSelectedIndex(index);
+                else
+                    this._removeSelectedIndex(index);
                 item.event(Event.CHANGED);
             }
             else {
+                // caochangli - 只能选中
                 if (!item.selected) {
-                    this.clearExcept(item);
+                    this.clearExcept(item,index);
+                    // caochangli - 添加选中索引
+                    this._addSelectedIndex(index);
                     item.selected = true;
                     item.event(Event.CHANGED);
                 }
-                else if (evt.button == 0)
-                    this.clearExcept(item);
+                // caochangli - 多余调用
+                // else if (evt.button == 0)
+                //     this.clearExcept(item,index);
             }
         }
 
@@ -455,4 +592,56 @@ export class Selection implements ISelection {
         if (this._controller)
             this._controller.release();
     }
+
+
+
+//#region 功能扩展
+
+    /**获取选中的Item */
+    get selectedItem():GWidget | null {
+        let index = this.index;
+        if (index == -1)
+            return null;
+        return this._owner.getChildAt(index);
+    }
+
+    /**获取选中的Item列表 */
+    get selectedItems():Array<GWidget> | null {
+        let indexs = this.get();
+        if (!indexs || indexs.length <= 0)
+            return null;
+        let result = [];
+        for (let i = 0,length = indexs.length; i < length; i++)
+        {
+            let obj = this._owner.getChildAt(indexs[i]);
+            if (obj)
+                result.push(obj);
+        }
+        return result;
+    }
+
+    /**当前正在渲染的Item列表 */
+    get rendererItems():Array<GWidget> | null {
+        return this._owner.children as any;
+    }
+
+    // caochangli - 添加选中索引
+    protected _addSelectedIndex(index:number):void {
+        if (!this._useChangeSelected) return;
+        if (!this._selectedIndexs)
+            this._selectedIndexs = [];
+        else if (this._selectedIndexs.indexOf(index) >= 0)
+            return;
+        this._selectedIndexs.push(index);    
+    }
+    // caochangli - 删除选中索引
+    protected _removeSelectedIndex(index:number):void {
+        if (!this._useChangeSelected) return;
+        if (!this._selectedIndexs)
+            return;
+        let sIndex = this._selectedIndexs.indexOf(index);
+        if (sIndex >= 0)
+            this._selectedIndexs.splice(sIndex,1);   
+    }
+//#endregion
 }

@@ -213,7 +213,13 @@ export class HierarchyParser {
                 runtime = options.runtime;
             let node: Node;
             if (runtime) {
-                node = new runtime();
+                // caochangli - 传入了实例的对象解析预制体
+                if (options && options.clsIns) {
+                    node = options.clsIns;
+                    delete options.clsIns;
+                }
+                else
+                    node = new runtime();
                 if (!(node instanceof Node)) {
                     errors.push(new Error(`runtime class invalid - '${runtime}', must derive from Node`));
                     node = null;
@@ -485,34 +491,28 @@ export class HierarchyParser {
             else if ((type = data._$type) != null) {
                 if (type.endsWith(".bp"))
                     addInnerUrl(type, null, true);
-                //caochangli - 预制体中增加资源依赖
-                else if (type == "GImage") {
-                    let url = data.src;
-                    if (url) {
-                        let index = url.startsWith("res://") ? url.indexOf("@") : -1;
-                        if (index != -1) {
-                            // res://55fd0692-d625-4fe3-b7c9-f27b5de4982b@age_waring_tip
-                            addInnerUrl(url.substring(0,index), Loader.ATLAS);
-                        } else
-                            addInnerUrl(url, Loader.IMAGE);
-                    }
-                }
-                else if (type == "Spine2DRenderNode") {
-                    if (data.source) {
-                        addInnerUrl(data.source, Loader.SPINE);
-                    }
-                }
-                //caochangli - 预制体中增加资源依赖
                 else if (LayaEnv.isPreview && Utils.isUUID(type)) {
                     let cls = ClassUtils.getClass(type);
                     if (cls == null || cls._$loadable)
                         addInnerUrl("res://" + type, null);
+                } else {
+                    // caochangli - 补充资源依赖处理
+                    supplementInner(type, data);
                 }
             }
-            check(data);
+
+            // caochangli - 上述逻辑已经检索过data的补充资源依赖
+            check(data, false);
         }
 
-        function check(data: any) {
+        let typeStr: string;
+        function check(data: any, needCheckSupplementInner:boolean = true) {
+
+            // caochangli - 补充资源依赖处理
+            if (needCheckSupplementInner && (type = data._$type) != null) {
+                supplementInner(type, data);
+            }
+
             for (let key in data) {
                 let child = data[key];
                 if (child == null)
@@ -521,27 +521,90 @@ export class HierarchyParser {
                     for (let item of child) {
                         if (item == null)
                             continue;
-
-                        if (typeof (item) === "object") {
+                        typeStr = typeof (item);
+                        // if (typeof (item) === "object") {
+                        if (typeStr === "object") {
                             checkData(item);
                         }
-                        else if (typeof (item) === "string" && item.startsWith("i18n:")) {
+                        // else if (typeof (item) === "string" && item.startsWith("i18n:")) {
+                        else if (typeStr === "string" && item.startsWith("i18n:")) {
                             let i = item.indexOf(":", 5);
                             if (i != -1)
                                 addInnerUrl(AssetDb.inst.getI18nSettingsURL(item.substring(5, i)), null);
                         }
                     }
-                }
-                else if (typeof (child) === "object") {
-                    checkData(child);
-                }
-                else if (typeof (child) === "string" && child.startsWith("i18n:")) {
-                    let i = child.indexOf(":", 5);
-                    if (i != -1)
-                        addInnerUrl(AssetDb.inst.getI18nSettingsURL(child.substring(5, i)), null);
+                } else {
+                    typeStr = typeof (child);
+                    if (typeStr === "object") {
+                        checkData(child);
+                    }
+                    else if (typeStr === "string" && child.startsWith("i18n:")) {
+                        let i = child.indexOf(":", 5);
+                        if (i != -1)
+                            addInnerUrl(AssetDb.inst.getI18nSettingsURL(child.substring(5, i)), null);
+                    }
                 }
             }
         }
+
+        // caochangli - 补充资源依赖处理
+        function supplementInner(type:string,data:any) {
+            if (type == "Sprite") {
+                if (data.texture)
+                    addInnerTexture(data.texture._$uuid);
+            }
+            else if (type == "GImage") {
+                addInnerTexture(data.src);
+            }
+            else if (type == "Spine2DRenderNode" || type == "SSpine2DRenderNode") {
+                if (data.source) {
+                    addInnerUrl(data.source, Loader.SPINE, true);
+                }
+            }
+            else if (type == "SButton") {
+                addInnerTexture(data.upSkin);
+                addInnerTexture(data.overSkin);
+                addInnerTexture(data.downSkin);
+                addInnerTexture(data.disableSkin);
+                addInnerTexture(data.selectedSkin);
+                addInnerTexture(data.selectedOverSkin);
+                addInnerTexture(data.selectedDownSkin);
+                addInnerTexture(data.selectedDisableSkin);
+            }
+            else if (type == "SComboBox") {
+                addInnerTexture(data.upSkin);
+                addInnerTexture(data.overSkin);
+                addInnerTexture(data.downSkin);
+                addInnerTexture(data.disableSkin);
+                addInnerTexture(data.arrowUpSkin);
+                addInnerTexture(data.arrowOverSkin);
+                addInnerTexture(data.arrowDownSkin);
+                addInnerTexture(data.arrowDisableSkin);
+            }
+        }
+        function addInnerTexture(url:string) {
+            if (!url) return;
+            //预览环境
+            if (LayaEnv.isPreview) {
+                let index = url.startsWith("res://") ? url.indexOf("@") : -1;
+                if (index != -1)//引用图集散图 - 改为加载图集
+                    // res://55fd0692-d625-4fe3-b7c9-f27b5de4982b@age_waring_tip
+                    addInnerUrl(url.substring(0,index), Loader.ATLAS, true);
+                else
+                    addInnerUrl(url, Loader.IMAGE, true);
+            }
+            //生产环境 
+            else {
+                let index = url.indexOf("resources/atlas/");//根据目录结构判断是否是图集 - 有点狗
+                if (index != -1) {//引用图集散图 - 改为加载图集
+                    // resources/atlas/base/cmn_text_btn_gray_259_78.png
+                    addInnerUrl(`${url.substring(0,url.lastIndexOf("/"))}.atlas`, Loader.ATLAS, true);
+                } 
+                else
+                    addInnerUrl(url, Loader.IMAGE, true);
+            }
+        }
+        // caochangli - 补充资源依赖处理
 
         check(data);
 

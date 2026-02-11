@@ -15,9 +15,15 @@ export interface ISelection {
      */
     scrollItemToViewOnClick: boolean;
 
+    /**caochangli - 允许右键选中，默认值修改成false */
+    allowSelectByRightClick: boolean;
+
+    /**caochangli - 增加允许点击选中，默认false */
+    allowSelectedByClick: boolean;
+
     /**
      * @en The currently selected item.
-     * @zh 当前选中的项。
+     * @zh 当前选中的项。 每次设置清除之前的选择
      */
     get index(): number;
     set index(value: number);
@@ -97,4 +103,14 @@ export interface ISelection {
 
     /** @internal */
     _refresh(): void;
+
+
+    /**获取选中的Item */
+    get selectedItem():GWidget | null;
+
+    /**获取选中的Item列表 */
+    get selectedItems():Array<GWidget> | null;
+
+    /**当前正在渲染的Item列表 */
+    get rendererItems():Array<GWidget> | null;
 }

@@ -37,6 +37,8 @@ export class GWidget extends Sprite {
 
     private _tooltips: string;
     private _grayed: boolean = false;
+    //caochangli
+    protected _enabled:boolean = true;
     private _background: IGraphicsCmd;
 
     private _draggable: boolean = false;
@@ -261,16 +263,24 @@ export class GWidget extends Sprite {
         }
     }
 
+    
     /**
      * @en Indicates whether the widget is enabled.
      * @zh 指示小部件是否启用。
      */
     get enabled(): boolean {
-        return !this.grayed && this.mouseEnabled;
+        // return !this.grayed && this.mouseEnabled;
+        //caochangli 禁用和置灰分开
+        return this._enabled;
     }
 
     set enabled(value: boolean) {
-        this.grayed = !value;
+        // caochangli - 禁用未必置灰吧？
+        // 比如：按钮禁用但业务是换图的，不需要置灰
+        // 再比如：皮肤未获得时Image组件置灰，不能禁用需要点击到详情
+        // this.grayed = !value;
+        if (value == this._enabled) return;
+        this._enabled = value;
         this.mouseEnabled = value;
     }
 
@@ -451,7 +461,21 @@ export class GWidget extends Sprite {
      * @returns 返回当前的 GWidget 实例，以便进行方法链调用。
      */
     clearRelations(): this {
-        this._relations.length = 0;
+        // this._relations.length = 0;
+        // caochangli - 内存泄漏处理
+        if (this._relations && this._relations.length > 0)
+        {
+            let relation;
+            for (let i = 0,length = this._relations.length;i < length; i++)
+            {
+                relation = this._relations[i];
+                if (relation) {
+                    relation.target = null;
+                    relation.owner = null;
+                }
+            }
+            this._relations.length = 0;
+        }
         return this;
     }
 
@@ -677,6 +701,9 @@ export class GWidget extends Sprite {
             this._controllers[k].offAll();
         for (let g of this._gears)
             g.owner = null;
+        
+        // caochangli - 内存泄漏清理关联系统
+        this.clearRelations();
     }
 
     protected _sizeChanged(changeByLayout?: boolean): void {
@@ -737,9 +764,10 @@ export class GWidget extends Sprite {
         if (SerializeUtil.hasProp("_startPages")) {
             let col: Record<string, number> = (<any>this)._startPages;
             if (col) {
+                //caochangli - 加是否默认选中开关
                 for (let k in col) {
                     let c = this.getController(k);
-                    if (c)
+                    if (c && c.defaultSelected)
                         c.selectedIndex = col[k];
                 }
             }

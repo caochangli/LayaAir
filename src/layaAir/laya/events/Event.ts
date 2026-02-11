@@ -177,6 +177,14 @@ export class Event {
      * @zh 定义 `undisplay` 事件对象的 `type` 属性值。
      */
     static readonly UNDISPLAY = "undisplay";
+    /**
+     * @zh 定义 `destroy` 事件对象的 `type` 属性值。- caochangli
+     */
+    static readonly DESTROY = "destroy";
+    /**
+     * @zh 定义 `initCompleted` 事件对象的 `type` 属性值。- caochangli
+     */
+    static readonly INIT_COMPLETED = "initCompleted";
 
     /**
      * @en Defines the value of the `type` property of an `error` event object.

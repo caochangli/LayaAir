@@ -58,6 +58,8 @@ export const allBundles = [{
         'laya/physics/IPhysiscs2DFactory.ts',
 
         'laya/platform/**/*.*',
+
+        'laya/sgsExpand/**/*.*',
     ],
     copy: ['jsLibs/laya.workerloader.js']
 },
