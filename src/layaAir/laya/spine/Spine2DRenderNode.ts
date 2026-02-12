@@ -114,8 +114,7 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
     private _skin: string;
     private _offset: Vector2 = new Vector2();
     private _renderOffset: Vector2 = new Vector2();
-    /** @internal */
-    _setPreAlphaFlag = false;
+    private _setPreAlphaFlag = false;
     private _premultipliedAlpha = true;
 
     /** @ignore */
@@ -148,6 +147,12 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
         return this._externalSkins;
     }
     set externalSkins(value: ExternalSkin[]) {
+        if (this._externalSkins) {
+            this._externalSkins.forEach(skin => {
+                skin.target = null;
+            });
+            this._externalSkins.length = 0;
+        }
         if (value) {
             for (let i = value.length - 1; i >= 0; i--) {
                 value[i].target = this;
@@ -386,9 +391,11 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
         this._offset = value;
         this.boundsChange = true;
 
-        this._renderOffset.x = value.x + this._templet.offsetX;
-        this._renderOffset.y = value.y - this._templet.offsetY;
-        this._renderHandle.offset = this._renderOffset;
+        if (this._templet) {
+            this._renderOffset.x = value.x + this._templet.offsetX;
+            this._renderOffset.y = value.y - this._templet.offsetY;
+            this._renderHandle.offset = this._renderOffset;
+        }
         
         if (this.playState !== Spine2DRenderNode.PLAYING) {
             this.owner.repaint(RepaintFlag.UpdateRT);
@@ -1036,6 +1043,12 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
     onDestroy(): void {
         if (this._templet) {
             this.clear();
+        }
+        if (this._externalSkins) {
+            this._externalSkins.forEach(skin => {
+                skin.destroy();
+            });
+            this._externalSkins.length = 0;
         }
         this.spineItem.destroy();
     }

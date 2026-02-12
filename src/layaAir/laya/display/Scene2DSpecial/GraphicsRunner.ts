@@ -1507,7 +1507,7 @@ export class GraphicsRunner {
             && !this.isSameClipInfo(submit)
         // && this._curSubmit.material == this._material
 
-        let mesh = this._meshPool[this._currentMeshIndex];
+        let mesh = this._curSubmit.mesh || this._meshPool[this._currentMeshIndex];
 
         var curEleNum = 0;
         let m: Matrix = this._curMat;
@@ -2163,7 +2163,7 @@ export class GraphicsRunner {
 
         for (let i = 0; i < cachedBuckets.length; i++) {
             let bucket = cachedBuckets[i];
-            if (bucket.indexs.length * this._vertexBlockSize < vertexCount) continue;
+            if (!bucket || bucket.indexs.length * this._vertexBlockSize < vertexCount) continue;
 
             let reuseBlocks = bucket.indexs.splice(0, needBlocks);
             // reuseBlocks.sort();
@@ -2321,7 +2321,7 @@ export class GraphicsRunner {
         submit.indexCount += indexCount;
 
         if (this._currentSubmitCache && cachedVbdata) {
-            this._currentSubmitCache.vertexCount += vertexCount;
+            this._currentSubmitCache.vertexCount += vertexViews.length * 4;
             this._currentSubmitCache.chunks.push({
                 vbdata: cachedVbdata,
                 vertexCount: vertexCount,

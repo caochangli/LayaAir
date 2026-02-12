@@ -32,6 +32,10 @@ export class PostProcess2D extends EventDispatcher {
       Effect2DShaderInit.glow2DShaderInit();
    }
 
+   /**
+    * @en Whether the post-processing effect is enabled.
+    * @zh 是否启用后期处理效果。
+    */
    get enabled(): boolean {
       return this._enabled;
    }
@@ -197,6 +201,9 @@ export class PostProcess2D extends EventDispatcher {
     * @zh 清除所有后期处理效果。
     */
    clear() {
+      for (let i = 0; i < this._effects.length; i++) {
+         this._effects[i].destroy();
+      }
       this._effects.length = 0;
       this._onChangeRender();
    }

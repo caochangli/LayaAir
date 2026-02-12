@@ -1,13 +1,13 @@
-import { EventDispatcher } from "../events/EventDispatcher";
-import type { GWidget } from "./GWidget";
-import { Event } from "../events/Event";
-import { ControllerRef } from "./ControllerRef";
 import { Mutable } from "../../ILaya";
+import { Event } from "../events/Event";
+import { EventDispatcher } from "../events/EventDispatcher";
+import { ControllerRef } from "./ControllerRef";
 import { GearDisplay } from "./gear/GearDisplay";
+import type { GWidget } from "./GWidget";
 
 /**
  * @en Controller class manages a set of pages, allowing for selection and change notifications.
- * @zh 控制器类管理一组页面，允许选择和更改通知。- 控制器修改默认不选中(IDE不好改，就没动了，也就是说IDE中设置的默认选中是无效的)
+ * @zh 控制器定义了一组页面，通过与齿轮(Gears)配合使用，可以实现节点的属性在不同页面间切换(IDE不好改，就没动了，也就是说IDE中设置的默认选中是无效的)
  */
 export class Controller extends EventDispatcher {
     /** caochangli - 控制器修改默认不选中(IDE不好改，就没动了，也就是说IDE中设置的默认选中是无效的)

@@ -303,6 +303,7 @@ export class RTRenderStruct2D implements IRenderStruct2D {
       else
          this._nativeObj.setRenderUpdate(null);
    }
+   
    setClipRect(rect: Rectangle): void {
       this._nativeObj.setClipRect(rect);
    }

@@ -63,8 +63,8 @@ export class FillTextureCmd implements IGraphicsCmd {
     percent: boolean = true;
 
     /**
-     * @en (Optional) Drawing color
-     * @zh （可选）绘图颜色
+     * @en (Optional) Drawing color. The format is ABGR.
+     * @zh （可选）绘图颜色。格式是ABGR。
      */
     color: number = 0xffffffff;
 
@@ -162,8 +162,7 @@ export class FillTextureCmd implements IGraphicsCmd {
     }
 
     /**
-     * @en Returns 1 if percent is true, otherwise returns 0.
-     * @zh 如果percent为true返回1，否则返回0。
+     * @ignore @blueprintIgnore
      */
     needsLayoutRepaint(): number {
         return this.percent ? 1 : 0;

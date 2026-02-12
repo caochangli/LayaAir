@@ -9,6 +9,8 @@ import { VertexStream } from "../../utils/VertexStream"
 import { IGraphicsBoundsAssembler, IGraphicsCmd } from "../IGraphics";
 import { GraphicsRunner } from "../Scene2DSpecial/GraphicsRunner"
 import { Rectangle } from "../../maths/Rectangle"
+import { Config } from "../../../Config";
+import { UVClippingUtils } from "../../webgl/utils/UVClippingUtils";
 
 const className = "DrawTrianglesCmd";
 
@@ -19,8 +21,6 @@ const className = "DrawTrianglesCmd";
 export class DrawTrianglesCmd implements IGraphicsCmd {
     /** @internal */
     _cacheData: any;
-
-    canCache: boolean = true;
     
     /**
      * @en Identifier for the DrawTrianglesCmd
@@ -124,7 +124,6 @@ export class DrawTrianglesCmd implements IGraphicsCmd {
         cmd.alpha = alpha ?? 1;
         cmd.color = color != null ? ColorUtils.create(color).numColor : 0xffffffff;
         cmd.blendMode = blendMode;
-        cmd.canCache = true;
         return cmd;
     }
 
@@ -148,7 +147,6 @@ export class DrawTrianglesCmd implements IGraphicsCmd {
         cmd.y = 0;
         cmd.mesh = mesh;
         cmd.color = color != null ? ColorUtils.create(color).numColor : 0xffffffff;
-        cmd.canCache = false;
         return cmd;
     }
 
@@ -191,13 +189,34 @@ export class DrawTrianglesCmd implements IGraphicsCmd {
                 console.error(e);
             }
 
-            runner.drawTriangles(this.texture, this.x + gx, this.y + gy, vb.getVertices(), vb.getUVs(), vb.getIndices(),
-                this.matrix, this.alpha, this.blendMode, null, vb.getColors(), this.texture?.uvrect);
+            if (this.texture?.uvrect) {
+                if (Config.uvClipMode === "cpu") {
+                    const clippedData = UVClippingUtils.clipTrianglesByUVRange(
+                        vb.getVertices(), vb.getIndices(), vb.getUVs(), this.texture.uvrect, vb.getColors()
+                    );
+                    runner.drawTriangles(this.texture, this.x + gx, this.y + gy,
+                        clippedData.vertices, clippedData.uvs, clippedData.indices,
+                        this.matrix, this.alpha, this.blendMode, null, clippedData.colors,
+                        null);
+                } else {
+                    runner.drawTriangles(this.texture, this.x + gx, this.y + gy,
+                        vb.getVertices(), vb.getUVs(), vb.getIndices(),
+                        this.matrix, this.alpha, this.blendMode, null, vb.getColors(),
+                        this.texture.uvrect);
+                }
+            } else {
+                runner.drawTriangles(this.texture, this.x + gx, this.y + gy,
+                    vb.getVertices(), vb.getUVs(), vb.getIndices(),
+                    this.matrix, this.alpha, this.blendMode, null, vb.getColors(),
+                    null);
+            }
 
             VertexStream.pool.recover(vb);
         }
         else if (this.vertices && this.uvs && this.indices) {
-            runner.drawTriangles(this.texture, this.x + gx, this.y + gy, this.vertices, this.uvs, this.indices,
+            // 直接传递顶点数据的路径（无需裁剪处理）
+            runner.drawTriangles(this.texture, this.x + gx, this.y + gy,
+                this.vertices, this.uvs, this.indices,
                 this.matrix, this.alpha, this.blendMode, this.color);
         }
     }

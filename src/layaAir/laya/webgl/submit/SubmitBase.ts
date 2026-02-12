@@ -178,7 +178,6 @@ export class SubmitBase {
 
     /**
      * @param info 添加顶点数据到submit
-     * @param positions 顶点位置数组
      */
     appendData(info: MeshBlockInfo) {
         let originLength = this._currentVertexBlocks.length;
@@ -225,15 +224,13 @@ export class SubmitBase {
             
         let needUpdateIndexData = indexViewChanged || vertexBlocksChanged;
 
-        if (needUpdateIndexData) {
-            if (this.indices.length !== this.indexCount) {
-                this.indices.length = this.indexCount;
-            }
-            indexView.setData(this.indices);
+        if (this.indices.length !== this.indexCount) {
+            this.indices.length = this.indexCount;
+        }
+        indexView.setData(this.indices);
 
-            if (Browser.onLayaRuntime) {
-                this._bufferBlock.vertexs = this.vertexs.elements;
-            }
+        if (vertexBlocksChanged && Browser.onLayaRuntime) {
+            this._bufferBlock.vertexs = this.vertexs.elements;
         }
         
         this._bufferBlockDirty = needUpdateIndexData;
