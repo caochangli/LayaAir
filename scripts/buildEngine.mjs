@@ -259,7 +259,7 @@ async function buildDeclarations() {
 
     shellExec("npx", ["copyfiles", '-f', './src/layaAir/tslibs/*.*', './build/types']);
     if(customConfig && customConfig.LayaIDEPath)
-        shellExec("npx", ["copyfiles", '-u 1', './build/*.*', path.join(customConfig.LayaIDEPath,'resources/engine')]);
+        shellExec("npx", ["copyfiles", '-u 1', './build/**/*', path.join(customConfig.LayaIDEPath,'engine')]);
     if(customConfig && customConfig.RestartIDE)
         restartIDE();
     console.timeEnd("completed");
