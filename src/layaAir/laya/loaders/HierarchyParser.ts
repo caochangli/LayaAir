@@ -3,7 +3,7 @@ import { Component } from "../components/Component";
 import { Node } from "../display/Node";
 import { Scene } from "../display/Scene";
 import { Sprite } from "../display/Sprite";
-import { Loader, ILoadURL } from "../net/Loader";
+import { ILoadURL, Loader } from "../net/Loader";
 import { URL } from "../net/URL";
 import { AssetDb } from "../resource/AssetDb";
 import { Prefab } from "../resource/HierarchyResource";
@@ -596,7 +596,7 @@ export class HierarchyParser {
             }
             //生产环境 
             else {
-                let index = url.indexOf("resources/atlas/");//根据目录结构判断是否是图集 - 有点狗
+                let index = url.indexOf("res/atlas/");//根据目录结构判断是否是图集 - 有点狗
                 if (index != -1) {//引用图集散图 - 改为加载图集
                     // resources/atlas/base/cmn_text_btn_gray_259_78.png
                     addInnerUrl(`${url.substring(0,url.lastIndexOf("/"))}.atlas`, Loader.ATLAS, true);
