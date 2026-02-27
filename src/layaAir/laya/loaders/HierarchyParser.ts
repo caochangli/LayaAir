@@ -261,7 +261,8 @@ export class HierarchyParser {
                         for (let j = 0; j < num; j++) {
                             let m = k - num + j;
                             let n = outNodes[m];
-                            if (n && !n.parent) { //是预制体新增
+                            // caochangli - 增加destroyed判断
+                            if (n && !n.parent && !n.destroyed) { //是预制体新增
                                 let nodeData2 = outNodeData[m];
                                 let parentNode = findNodeInPrefab(node, nodeData2._$parent);
                                 if (parentNode) {
