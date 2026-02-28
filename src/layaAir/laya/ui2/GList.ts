@@ -85,7 +85,13 @@ export class GList extends GPanel {
      * @returns A GWidget object. 
      */
     getFromPool(url?: string): GWidget {
+        // caochangli - 控制标记
+        SerializeUtil.isSgsDeserializing = true;
+        // caochangli - 控制标记
         let obj = this._pool.take(url);
+        // caochangli - 控制标记
+        SerializeUtil.isSgsDeserializing = false;
+        // caochangli - 控制标记
         if (obj)
             obj.visible = true;
         return obj;

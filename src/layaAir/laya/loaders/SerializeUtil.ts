@@ -13,6 +13,10 @@ export const TypedArrayClasses: Record<string, any> = {
 };
 
 export class SerializeUtil {
+
+    /**caochangli - 是否反序列化中，用于判断RT类中的CT控制类是否还需要再PrefabImpl.create*/
+    public static isSgsDeserializing = false;
+
     public static isDeserializing = false;
 
     static _data: any;
