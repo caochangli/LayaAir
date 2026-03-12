@@ -15,6 +15,9 @@ export class ImageRenderer {
     _tex: Texture;
     _onReload: Function;
 
+    // caochangli - 增加主动设置九宫格
+    _sizeGrid: Array<number>;
+
     private _owner: Sprite;
     private _drawCmd: DrawTextureCmd | Draw9GridTextureCmd | DrawTrianglesCmd;
 
@@ -52,6 +55,29 @@ export class ImageRenderer {
         }
     }
 
+    // caochangli - 增加主动设置九宫格
+    setSizeGrid(value: Array<number>) {
+        if (!this._sizeGrid && !value)
+            return;
+        if (this._sizeGrid && value && this._sizeGrid.length == value.length)
+        {
+            let isSame = true;
+            for (let i = 0,length = this._sizeGrid.length; i < length; i++)
+            {
+                if (this._sizeGrid[i] != value[i])
+                {
+                    isSame = false;
+                    break;
+                }
+            }
+            if (isSame) return;
+        }
+        this._sizeGrid = value;
+        // 纹理已存在，且纹理不带九宫格
+        if (this._tex && !this._tex._sizeGrid)
+            this.createCmd();
+    }
+
     setMesh(value: IMeshFactory) {
         if (this._meshFactory === value) {
             this._owner.graphics.repaint();
@@ -79,7 +105,7 @@ export class ImageRenderer {
         let drawClass: typeof DrawTextureCmd | typeof Draw9GridTextureCmd | typeof DrawTrianglesCmd;
         if (this._meshFactory)
             drawClass = DrawTrianglesCmd;
-        else if (this._tex._sizeGrid)
+        else if (this._tex._sizeGrid || this._sizeGrid)//caochangli - 增加主动设置九宫格
             drawClass = Draw9GridTextureCmd;
         else
             drawClass = DrawTextureCmd;
@@ -99,8 +125,8 @@ export class ImageRenderer {
         let cmd: DrawTextureCmd | Draw9GridTextureCmd | DrawTrianglesCmd;
         if (this._meshFactory)
             cmd = DrawTrianglesCmd.create2(this._tex, this._meshFactory);
-        else if (this._tex._sizeGrid)
-            cmd = Draw9GridTextureCmd.create(this._tex, 0, 0, 1, 1, this._tex._sizeGrid, true);
+        else if (this._tex._sizeGrid || this._sizeGrid)//caochangli - 增加主动设置九宫格
+            cmd = Draw9GridTextureCmd.create(this._tex, 0, 0, 1, 1, this._tex._sizeGrid || this._sizeGrid, true);//caochangli - 增加主动设置九宫格
         else
             cmd = DrawTextureCmd.create(this._tex, 0, 0, 1, 1, null, 1, null, null, null, true);
         (cmd as IGraphicsCmd).lock = true;

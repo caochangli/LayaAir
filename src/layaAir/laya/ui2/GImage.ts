@@ -50,6 +50,31 @@ export class GImage extends GWidget {
     }
 
     /**
+     * caochangli - 增加主动设置九宫格(纹理有以纹理九宫格为准，纹理无以设置的为准)
+     * @param value - 顺序：上、右、下、左、是否重复填充(0、1 - 可缺省，缺省则默认0)
+     */
+    setSizeGrid(value: Array<number>) {
+        if (value)
+        {
+            let length:number = value.length;
+            if (length < 4)
+            {
+                console.error(`九宫格设置非法，请至少设置四边：${value}`);
+                return;
+            }
+            else if (length > 5)
+            {
+                console.error(`九宫格设置非法，只能设置四边和是否填充：${value}`);
+                return;
+            }
+            // 缺少是否填充 - 默认不填充
+            else if (length == 4)
+                value.push(0);
+        }
+        this._renderer.setSizeGrid(value);
+    }
+
+    /**
      * @en The source URL of the image resource.
      * @zh 图像资源的源 URL。
      */
