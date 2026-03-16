@@ -49,4 +49,8 @@ export interface IListLayout extends ILayout {
     _setVirtual(loop: boolean): void;
     /** @internal */
     readonly _virtual: boolean;
+
+    /**虚拟列表可视范围外多创建Item个数 - 默认1个*/
+    get virtualMoreItemNum():number
+    set virtualMoreItemNum(value:number)
 }

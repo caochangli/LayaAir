@@ -31,6 +31,12 @@ export class ListLayout extends Layout {
     private _offsetX: number;
     private _offsetY: number;
 
+    /**虚拟列表可视范围外多创建Item个数(默认1个) - caochangli */
+    private _virtualMoreItemNum:number = 1;
+    /**虚拟列表可视范围外多创建Item个数(默认1个) - caochangli */
+    get virtualMoreItemNum():number {return this._virtualMoreItemNum; }
+    set virtualMoreItemNum(value: number) { this._virtualMoreItemNum = value; }
+
     // constructor(owner: GBox)
     // {
     //     super(owner);
@@ -753,7 +759,7 @@ export class ListLayout extends Layout {
             ii.flag = this._itemInfoVer;
             ii.obj.setLeftTop(this._offsetX + curX, curY);
             if (curIndex === newFirstIndex) //要显示多一条才不会穿帮
-                max += ii.height;
+                max += ii.height * this._virtualMoreItemNum; //caochangli - 增加多创建个数
 
             curX += ii.width + this._columnGap;
 
@@ -937,7 +943,7 @@ export class ListLayout extends Layout {
             ii.flag = this._itemInfoVer;
             ii.obj.setLeftTop(curX, this._offsetY + curY);
             if (curIndex === newFirstIndex) //要显示多一条才不会穿帮
-                max += ii.width;
+                max += ii.width * this._virtualMoreItemNum; //caochangli - 增加多创建个数
 
             curY += ii.height + this._rowGap;
 
