@@ -1,4 +1,7 @@
+import { ILaya } from "../../ILaya";
+import { LayaEnv } from "../../LayaEnv";
 import { Utils } from "../utils/Utils";
+import { Texture } from "./Texture";
 /**
  * @en This class is used to describe resources.
  * @zh 此类用来描述资源
@@ -182,5 +185,47 @@ export class AssetDb {
      */
     getI18nSettingsURL(id: string): string {
         return this.i18nUrlMap[id];
+    }
+
+    /**
+     * caochangli - 预览模式下获取图集中小图转换
+     * @param url 
+     */
+    previewAtlasTexture(url:string):Texture
+    {
+        if (!LayaEnv.isPreview || !url)
+            return null;
+        
+        // 预览模式坑爹点，发布后没有uuid，全部用路径不存在此坑
+        // 即便图集已加载，首次getRes("res://***@***")还是获取不到资源，因为uuid和路径映射关系还没有，必须走一遍异步load加载才会建立映射关系
+        // 这就意味着即便预加载了图集，使用图集散图还是无法直接同步获取，只能走异步加载
+
+        let tex:Texture;
+        let index = url.indexOf("@");
+        if (index >= 0 && url.startsWith("res://"))
+        {
+            let atlasUUID = url.substring(0,index);
+            let atlas = ILaya.Loader.getAtlas(atlasUUID);
+            if (atlas)
+            {
+                let imgName = url.substring(index + 1);
+                let imgUrl = `${atlas.dir}${imgName}.png`;
+                tex = ILaya.Loader.getRes(imgUrl);
+                if (!tex)
+                {
+                    imgUrl = `${atlas.dir}${imgName}.jpg`;
+                    tex = ILaya.Loader.getRes(imgUrl);
+                }
+                if (tex)
+                {
+                    let texUUID = `${atlasUUID.substring(6)}@${imgName}`;
+                    tex.uuid = texUUID;
+                    this.uuidMap[texUUID] = tex.url;
+                    this.uuidMap[tex.url] = texUUID;
+                }
+            }
+        }
+
+        return tex;
     }
 }

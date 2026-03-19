@@ -484,7 +484,16 @@ export class HierarchyParser {
         let type: string;
         function checkData(data: any) {
             if (data._$uuid != null) {
-                data._$uuid = addInnerUrl(data._$uuid, Loader.assetTypeToLoadType[data._$type]);
+                // caochangli - 图片中散图转换成加载图集，如：GWidget.background中texture纹理
+                if (data._$type == "Texture")
+                {
+                    if (Utils.isUUID(data._$uuid))
+                        data._$uuid = "res://" + data._$uuid;
+                    addInnerTexture(data._$uuid);
+                }
+                // caochangli - 图片中散图转换成加载图集，如：GWidget.background中texture纹理
+                else
+                    data._$uuid = addInnerUrl(data._$uuid, Loader.assetTypeToLoadType[data._$type]);
                 return;
             }
 
@@ -585,25 +594,25 @@ export class HierarchyParser {
             }
         }
         function addInnerTexture(url:string) {
-            if (!url) return;
+            if (!url) return "";
             //预览环境
             if (LayaEnv.isPreview) {
                 let index = url.startsWith("res://") ? url.indexOf("@") : -1;
                 if (index != -1)//引用图集散图 - 改为加载图集
                     // res://55fd0692-d625-4fe3-b7c9-f27b5de4982b@age_waring_tip
-                    addInnerUrl(url.substring(0,index), Loader.ATLAS, true);
+                    return addInnerUrl(url.substring(0,index), Loader.ATLAS, true);
                 else
-                    addInnerUrl(url, Loader.IMAGE, true);
+                    return addInnerUrl(url, Loader.IMAGE, true);
             }
             //生产环境 
             else {
                 let index = url.indexOf("res/atlas/");//根据目录结构判断是否是图集 - 有点狗
                 if (index != -1) {//引用图集散图 - 改为加载图集
-                    // resources/atlas/base/cmn_text_btn_gray_259_78.png
-                    addInnerUrl(`${url.substring(0,url.lastIndexOf("/"))}.atlas`, Loader.ATLAS, true);
+                    // res/atlas/base/cmn_text_btn_gray_259_78.png
+                    return addInnerUrl(`${url.substring(0,url.lastIndexOf("/"))}.atlas`, Loader.ATLAS, true);
                 } 
                 else
-                    addInnerUrl(url, Loader.IMAGE, true);
+                    return addInnerUrl(url, Loader.IMAGE, true);
             }
         }
         // caochangli - 补充资源依赖处理

@@ -1,8 +1,10 @@
 import { ILaya } from "../../ILaya";
+import { LayaEnv } from "../../LayaEnv";
 import { Node } from "../display/Node";
 import { Sprite } from "../display/Sprite";
 import { Loader } from "../net/Loader";
 import { URL } from "../net/URL";
+import { AssetDb } from "../resource/AssetDb";
 import { PrefabImpl } from "../resource/PrefabImpl";
 import { GWidget } from "../ui2/GWidget";
 import { ClassUtils } from "../utils/ClassUtils";
@@ -86,6 +88,17 @@ export class ObjDecoder {
         else if (typeof (data) === "object") {
             if (data._$uuid != null) {
                 let url = URL.getResURLByUUID(data._$uuid);
+                
+                // caochangli - 预览模式图片中散图因uuid和路径映射关系还没有,获取不到纹理问题修复，如：GWidget.background中texture纹理
+                if (data._$type == "Texture" && LayaEnv.isPreview)
+                {
+                    let texture = ILaya.loader.getRes(url, Loader.assetTypeToLoadType[data._$type]);
+                    if (!texture)
+                        texture = AssetDb.inst.previewAtlasTexture(url);
+                    return texture;
+                }
+                // caochangli - 预览模式图片中散图获取问题修复，如：GWidget.background中texture纹理
+
                 return ILaya.loader.getRes(url, Loader.assetTypeToLoadType[data._$type]);
             }
 

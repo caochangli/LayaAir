@@ -9,7 +9,6 @@ import { ImageRenderer } from "./ImageRenderer";
 import { IMeshFactory } from "../display/mesh/MeshFactory";
 import { AssetDb } from "../resource/AssetDb";
 import { AssetGroup, IAssetGroup } from "../sgsExpand/loader/AssetGroup";
-import { AtlasResource } from "../resource/AtlasResource";
 import { LayaEnv } from "../../LayaEnv";
 
 /**
@@ -144,37 +143,10 @@ export class GImage extends GWidget {
         }
 
         let tex:Texture = Loader.getRes(this._src);
+        
+        // caochangli - 预览模式图片中散图因uuid和路径映射关系还没有,获取不到纹理问题修复
         if (!tex && LayaEnv.isPreview)
-        {
-            // 预览模式坑爹点，发布后没有uuid，全部用路径不存在此坑
-            // 即便图集已加载，首次getRes("res://***@***")还是获取不到资源，因为uuid和路径映射关系还没有，必须走一遍异步load加载才会建立映射关系
-            // 这就意味着即便预加载了图集，使用图集散图还是无法直接同步获取，只能走异步加载
-            let index = this._src.indexOf("@");
-            if (index >= 0 && this._src.startsWith("res://"))
-            {
-                let atlasUUID = this._src.substring(0,index);
-                let atlas:AtlasResource = Loader.getAtlas(atlasUUID);
-                if (atlas)
-                {
-                    let imgName = this._src.substring(index + 1);
-                    let imgUrl = `${atlas.dir}${imgName}.png`;
-                    tex = Loader.getRes(imgUrl);
-                    if (!tex)
-                    {
-                        imgUrl = `${atlas.dir}${imgName}.jpg`;
-                        tex = Loader.getRes(imgUrl);
-                    }
-                    if (tex)
-                    {
-                        let uuidMap = AssetDb.inst.uuidMap;
-                        let texUUID = `${atlasUUID.substring(6)}@${imgName}`;
-                        tex.uuid = texUUID;
-                        uuidMap[texUUID] = tex.url;
-                        uuidMap[tex.url] = texUUID;
-                    }
-                }
-            }
-        }
+            tex = AssetDb.inst.previewAtlasTexture(this._src);
         
         if (tex && tex.url)
         {   

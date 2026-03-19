@@ -12,6 +12,7 @@ export class Delegate {
     private _items: Array<any>;
 
     public constructor() {
+        //caochangli备注flag字段说明 - 0默认 1执行中 2已删除
         this._flag = 0;
         this._items = [];
     }
