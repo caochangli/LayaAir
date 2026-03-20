@@ -592,6 +592,15 @@ export class HierarchyParser {
                 addInnerTexture(data.arrowDownSkin);
                 addInnerTexture(data.arrowDisableSkin);
             }
+            else if (data.font) {
+                var fontStr = data.font;
+                if (Utils.getFileExtension(fontStr) || fontStr.startsWith("res://"))//过滤系统字
+                {
+                    // 可能是：.ttf、.fnt(BitmapFont)
+                    // 其中ttf加载后不会加到预制的_deps依赖中(因为ttf不是Resource类型)，所以ttf没有被计数、也不会被回收到，这里只起到了预加载功能
+                    addInnerUrl(fontStr, null, true);
+                }
+            }
         }
         function addInnerTexture(url:string) {
             if (!url) return "";

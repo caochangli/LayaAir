@@ -1,5 +1,6 @@
 import { Config } from "../../Config";
 import { ILaya } from "../../ILaya";
+import { LayaEnv } from "../../LayaEnv";
 import { HideFlags } from "../Const";
 import { Event } from "../events/Event";
 import { HtmlElement, HtmlElementType } from "../html/HtmlElement";
@@ -10,6 +11,8 @@ import { IHtmlObject } from "../html/IHtmlObject";
 import { UBBParser } from "../html/UBBParser";
 import { Point } from "../maths/Point";
 import { Rectangle } from "../maths/Rectangle";
+import { AssetDb } from "../resource/AssetDb";
+import { AssetGroup, IAssetGroup } from "../sgsExpand/loader/AssetGroup";
 import { Browser } from "../utils/Browser";
 import { Pool } from "../utils/Pool";
 import { Utils } from "../utils/Utils";
@@ -271,6 +274,13 @@ export class Text extends Sprite {
             (this._bgDrawCmd as IGraphicsCmd).lock = false;
 
         super.destroy(destroyChild);
+
+        //回收加载的BitmapFont资源
+        if (this._assetGroup)
+        {
+            AssetGroup.Release(this._assetGroup);
+            this._assetGroup = null;
+        }
     }
 
     /**
@@ -388,6 +398,13 @@ export class Text extends Sprite {
                 value = "Arial";
         }
 
+        // caochangli
+        if (this._realFont == value)
+            return;
+        // caochangli
+        if (this._assetGroup)
+            this._assetGroup.CancelAllAssets(true);
+
         this._realFont = value;
         this._bitmapFont = Text._bitmapFonts[value];
 
@@ -401,17 +418,30 @@ export class Text extends Sprite {
                 this._realFont = "Arial";
                 let t = this._textStyle.font;
 
-                ILaya.loader.load(value).then(fontObj => {
-                    if (this._textStyle.font != t || !fontObj)
-                        return;
+                // ILaya.loader.load(value).then(fontObj => {
+                //     if (this._textStyle.font != t || !fontObj)
+                //         return;
 
-                    if (fontObj instanceof BitmapFont)
-                        this._bitmapFont = fontObj;
-                    else
-                        this._realFont = fontObj.family;
-                    if (this._text)
-                        this.markChanged();
-                });
+                //     if (fontObj instanceof BitmapFont)
+                //         this._bitmapFont = fontObj;
+                //     else 
+                //         this._realFont = fontObj.family;
+                //     if (this._text)
+                //         this.markChanged();
+                // });
+                
+                // caochangli - 字体加载走业务层资源管理器(主要为了解决BitmapFont资源回收)
+                // ttf嵌入字也会走这里 - 嵌入字计数加上也没关系(嵌入字本身就不需要回收)，且已在clearRes删除接口中过滤了
+                // 预览模式 - 将uuid转成url
+                if (LayaEnv.isPreview)
+                {
+                    AssetDb.inst.uuidToUrl(value,(uuid:string,url:string)=>{
+                        if (!this.destroyed && value && value == uuid)
+                            this._loadFont(url,t);
+                    });
+                }
+                else
+                    this._loadFont(value,t);
             }
             else {
                 if (fontObj instanceof BitmapFont)
@@ -428,6 +458,25 @@ export class Text extends Sprite {
                 this.markChanged();
         }
     }
+
+    //caochangli - 走业务层资源管理器
+    private _assetGroup:IAssetGroup;
+    private _loadFont(url:string,styleFont:string) {
+        if (!this._assetGroup)
+            this._assetGroup = AssetGroup.Get();
+        this._assetGroup.Load(url,null,this,(url:string,fontObj:any)=>{
+            if (this._textStyle.font != styleFont || !fontObj)
+                return;
+
+            if (fontObj instanceof BitmapFont)
+                this._bitmapFont = fontObj;
+            else 
+                this._realFont = fontObj.family;
+            if (this._text)
+                this.markChanged();
+        });
+    }
+
 
     /**
      * @en The actual font name used for rendering.

@@ -271,6 +271,10 @@ export class Loader extends EventDispatcher {
      */
     static readonly typeMap: { [type: string]: TypeMapEntry } = {};
     /**
+     * caochangli - 嵌入字类型ID
+     */
+    static ttfTypeId:number;
+    /**
      * @en Hot overload identification.
      * @zh 热重载标识。
      * @blueprintIgnore
@@ -320,6 +324,10 @@ export class Loader extends EventDispatcher {
                 Loader.typeMap[type] = typeEntry = { typeId: typeIdCounter++, loaderType: cls };
             else if (typeEntry.loaderType != cls)
                 typeEntry = { typeId: typeEntry.typeId, loaderType: cls };
+
+            // caochangli - 记录下嵌入字typeId
+            if (type == Loader.TTF)
+                Loader.ttfTypeId = typeEntry.typeId;
         }
         else
             typeEntry = { typeId: typeIdCounter++, loaderType: cls };
@@ -1127,6 +1135,10 @@ export class Loader extends EventDispatcher {
     static _clearRes(url: string, checkObj?: any) {
         let entry = Loader.loadedMap[url];
         if (!entry)
+            return;
+
+        // caochangli - 嵌入字不回收
+        if (entry.length > 1 && entry[0] == Loader.ttfTypeId)
             return;
 
         if (checkObj) {
