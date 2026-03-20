@@ -442,8 +442,10 @@ export class GButton extends GLabel {
     }
 
     private _click(evt: Event): void {
-        if (this._sound)
-            SoundManager.playSound(this._sound).volume = this._soundVolumeScale;
+        // if (this._sound)
+        //     SoundManager.playSound(this._sound).volume = this._soundVolumeScale;
+        // caochangli - 从click方法中独立出来给子类重构
+        this.playSound();
 
         // caochangli - 增加备注：List的选择器是“单选&多选等”才触发
         let ss = (<GPanel>this.parent)?.selection;
@@ -479,6 +481,12 @@ export class GButton extends GLabel {
         if (ss && ss.mode != SelectionMode.None) {
             ss.handleClick(this, evt);
         }
+    }
+
+    /**播放音效 - caochangli从click方法中独立出来给子类重构 */
+    protected playSound():void {
+        if (this._sound)
+            SoundManager.playSound(this._sound).volume = this._soundVolumeScale;
     }
 
     /** @internal @blueprintEvent */
