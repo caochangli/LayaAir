@@ -835,8 +835,12 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
         }
         this._timeKeeper = null;
         this._skeleton = null;
-        this._state.clearListeners();
-        this._state = null;
+        //caochangli - 容错
+        if (this._state)
+        {
+            this._state.clearListeners();
+            this._state = null;
+        }
         this._pause = true;
         this._needUpdate = false;
         if (this._soundChannelArr.length > 0)
