@@ -10,8 +10,10 @@ import { SerializeUtil } from "../loaders/SerializeUtil";
 import { Color } from "../maths/Color";
 import { Point } from "../maths/Point";
 import { Loader } from "../net/Loader";
+import { AssetDb } from "../resource/AssetDb";
 import { AtlasResource } from "../resource/AtlasResource";
 import { Texture } from "../resource/Texture";
+import { AssetGroup, IAssetGroup } from "../sgsExpand/loader/AssetGroup";
 import { Component } from "./Component";
 
 export enum AnimationWrapMode {
@@ -103,6 +105,11 @@ export class FrameAnimation extends Component {
 
     declare readonly owner: Sprite;
 
+    // caochangli - 等待序列化结束再设置的图集
+    private _waitAtlas:AtlasResource;
+    // caochangli - 业务层资源管理器
+    private _assetGroup:IAssetGroup;
+
     /**
      * @en Constructor method of Animation.
      * @zh 动画类的构造方法
@@ -144,6 +151,22 @@ export class FrameAnimation extends Component {
     }
 
     set frames(value: ReadonlyArray<Texture>) {
+        if (this._assetGroup)
+            this._assetGroup.CancelAllAssets(true);
+        this.setFrames(value);
+    }
+
+    //caochangli - 通过onAfterDeserialize接口处理预制序列化完成后的逻辑
+    onAfterDeserialize() {
+        if (this._waitAtlas)
+        {
+            let waitAtlas = this._waitAtlas;
+            this._waitAtlas = null;
+            this.onLoaded(waitAtlas, this._loadId);
+        }
+    }
+    //caochangli - 拆分set frames方法(区分外部设置的话先停止正在加载的资源)
+    private setFrames(value: ReadonlyArray<Texture>) {
         if (this._drawCmd) {
             this.owner._graphics?.removeCmd(this._drawCmd);
             this._drawCmd = null;
@@ -392,11 +415,19 @@ export class FrameAnimation extends Component {
     protected _onDestroy(): void {
         super._onDestroy();
 
-        this.frames = null;
+        // this.frames = null;
+        this.setFrames(null);//caochangli - 改用拆分出来的内部方法
         if (this._atlas) {
             if (this.owner._getBit(NodeFlags.EDITING_NODE))
                 this._atlas.off("reload", this, this.onAtlasReload);
             this._atlas = null;
+        }
+
+        this._waitAtlas = null;
+        if (this._assetGroup)
+        {
+            AssetGroup.Release(this._assetGroup);
+            this._assetGroup = null;
         }
     }
 
@@ -531,6 +562,17 @@ export class FrameAnimation extends Component {
             this._atlas = null;
         }
 
+        // if (this._source)
+        //     this.loadAtlas(this._source);
+        // else if (this._images && this._images.length > 0)
+        //     this.loadImages(this._images);
+        // else
+        //     this.onLoaded(null, ++this._loadId);
+
+        // 走业务层资源管理器
+        if (this._assetGroup)
+            this._assetGroup.CancelAllAssets(true);
+
         if (this._source)
             this.loadAtlas(this._source);
         else if (this._images && this._images.length > 0)
@@ -541,34 +583,79 @@ export class FrameAnimation extends Component {
 
     protected loadImages(urls: string[]): this {
         let loadId = ++this._loadId;
-        let textures = urls.map(url => Loader.getRes(url));
-        if (textures.indexOf(null) === -1) {
-            this.frames = textures;
-            this.owner.event(Event.LOADED);
-        }
-        else {
-            ILaya.loader.load(urls).then((textures: Array<Texture>) => {
-                if (loadId != this._loadId || this.destroyed)
-                    return;
+        // let textures = urls.map(url => Loader.getRes(url));
+        // if (textures.indexOf(null) === -1) {
+        //     this.frames = textures;
+        //     this.owner.event(Event.LOADED);
+        // }
+        // else {
+        //     ILaya.loader.load(urls).then((textures: Array<Texture>) => {
+        //         if (loadId != this._loadId || this.destroyed)
+        //             return;
 
-                this.frames = textures;
-                this.owner.event(Event.LOADED);
-            });
-        }
+        //         this.frames = textures;
+        //         this.owner.event(Event.LOADED);
+        //     });
+        // }
+
+        if (!this._assetGroup)
+            this._assetGroup = AssetGroup.Get();
+        this._assetGroup.LoadGroup(urls,this,(group:IAssetGroup,resList:Array<any>)=>{
+            if (loadId != this._loadId || this.destroyed)
+                return;
+
+            this.setFrames(resList);
+            this.owner.event(Event.LOADED);
+        });
 
         return this;
     }
 
     protected loadAtlas(url: string): this {
         let loadId = ++this._loadId;
-        //在反序列化时，禁止立刻设置atlas，因为autoSize值还没反序列化
-        let atlas: AtlasResource = SerializeUtil.isDeserializing ? null : Loader.getRes(url, Loader.ATLAS);
-        if (atlas)
-            this.onLoaded(atlas, loadId);
+        // //在反序列化时，禁止立刻设置atlas，因为autoSize值还没反序列化
+        // let atlas: AtlasResource = SerializeUtil.isDeserializing ? null : Loader.getRes(url, Loader.ATLAS);
+        // if (atlas)
+        //     this.onLoaded(atlas, loadId);
+        // else
+        //     ILaya.loader.load(url, Loader.ATLAS).then(atlas => this.onLoaded(atlas, loadId));
+        
+        if (!this._assetGroup)
+            this._assetGroup = AssetGroup.Get();
+        //预览模式 - 将uuid转成url
+        if (LayaEnv.isPreview)
+        {
+            AssetDb.inst.uuidToUrl(url,(uuid:string,realUrl:string)=>{
+                if (!this.destroyed && url && url == uuid)
+                {
+                    if (!realUrl)
+                        this.checkDeserializing(null, loadId);
+                    else
+                        this._assetGroup.Load(realUrl,Loader.ATLAS,this,(url:string,atlas:any)=>{
+                            this.checkDeserializing(atlas, loadId);
+                        });
+                }
+            });
+        }
+        //生产模式 - 没有uuid，都是用路径加载的
         else
-            ILaya.loader.load(url, Loader.ATLAS).then(atlas => this.onLoaded(atlas, loadId));
+            this._assetGroup.Load(url,Loader.ATLAS,this,(url:string,atlas:any)=>{
+                this.checkDeserializing(atlas, loadId);
+            });
 
         return this;
+    }
+    // caochangli - 检查是否序列化中，等GMovieClip.autoSize设置完再设置预制中的图集
+    // 因预制体中只能设置图集，估只有图集会出现在序列化中设置的情况
+    private checkDeserializing(atlas:AtlasResource,loadId:number):void
+    {
+        //序列化中
+        if (SerializeUtil.isDeserializing)
+        {
+            this._waitAtlas = atlas;
+            return;
+        }
+        this.onLoaded(atlas,loadId);
     }
 
     /**
@@ -578,6 +665,9 @@ export class FrameAnimation extends Component {
      * @param res 图集。
      */
     setAtlas(res: AtlasResource) {
+        if (this._assetGroup)
+            this._assetGroup.CancelAllAssets(true);
+
         this.onLoaded(res, ++this._loadId);
     }
 
@@ -599,10 +689,12 @@ export class FrameAnimation extends Component {
                 if (ani.frameDelays)
                     this._delays.push(...ani.frameDelays);
             }
-            this.frames = atlas.frames;
+            // this.frames = atlas.frames;
+            this.setFrames(atlas.frames);//caochangli - 改用拆分出来的内部方法
         }
         else
-            this.frames = null;
+            // this.frames = null;
+            this.setFrames(null);//caochangli - 改用拆分出来的内部方法
         this.owner.event(Event.LOADED);
     }
 

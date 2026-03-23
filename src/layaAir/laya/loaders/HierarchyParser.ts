@@ -592,6 +592,10 @@ export class HierarchyParser {
                 addInnerTexture(data.arrowDownSkin);
                 addInnerTexture(data.arrowDisableSkin);
             }
+            else if (type == "GMovieClip") {
+                if (data.src)// 图集本身
+                    addInnerUrl(data.src, Loader.ATLAS, true);
+            }
             else if (data.font) {
                 var fontStr = data.font;
                 if (Utils.getFileExtension(fontStr) || fontStr.startsWith("res://"))//过滤系统字

@@ -26,6 +26,12 @@ export class GMovieClip extends GWidget {
         this.comp.stretchMode = AnimationStretchMode.ResizeToFit;
     }
 
+    //caochangli - 通过onAfterDeserialize接口处理预制序列化完成后的逻辑
+    onAfterDeserialize() {
+        if (this.comp)
+            this.comp.onAfterDeserialize();
+    }
+
     /**
      * @en The source URL of the animation resource.
      * @zh 动画资源的源 URL。
