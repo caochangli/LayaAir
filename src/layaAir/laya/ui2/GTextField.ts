@@ -30,7 +30,8 @@ export class GTextField extends GWidget {
         this.textIns.padding.fill(2);
         this.textIns._onPostLayout = () => this._onPostLayout();
         this.textIns._onTranslate = Translations.translate;
-        this.textIns.on(Event.LINK, (href: string) => this.event(Event.LINK, href));
+        // caochangli - 超链触发2次：Text触发一次，GTextField又触发一次(先把Text这里注释掉，后续有问题再看怎么处理)
+        // this.textIns.on(Event.LINK, (href: string) => this.event(Event.LINK, href));
         this.addChild(this.textIns);
     }
 

@@ -164,7 +164,7 @@ export class Event {
     static readonly ADDED = "added";
     /**
      * @en Defines the value of the `type` property of a `removed` event object.
-     * @zh 定义 `removed` 事件对象的 `type` 属性值。
+     * @zh 定义 `removed` 事件对象的 `type` 属性值。(caochangli - 没有父节点时移除不会触发REMOVED)
      */
     static readonly REMOVED = "removed";
     /**
@@ -181,10 +181,6 @@ export class Event {
      * @zh 定义 `destroy` 事件对象的 `type` 属性值。- caochangli
      */
     static readonly DESTROY = "destroy";
-    /**
-     * @zh 定义 `initCompleted` 事件对象的 `type` 属性值。- caochangli
-     */
-    static readonly INIT_COMPLETED = "initCompleted";
 
     /**
      * @en Defines the value of the `type` property of an `error` event object.
