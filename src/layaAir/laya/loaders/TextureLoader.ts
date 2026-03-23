@@ -1,22 +1,22 @@
-import { Texture2D, TextureConstructParams, TexturePropertyParams } from "../resource/Texture2D";
-import { Texture } from "../resource/Texture";
-import { IResourceLoader, ILoadTask, Loader, ILoadURL } from "../net/Loader";
-import { HDRTextureInfo } from "../RenderEngine/HDRTextureInfo";
-import { KTXTextureInfo } from "../RenderEngine/KTXTextureInfo";
-import { TextureDimension } from "../RenderEngine/RenderEnum/TextureDimension";
-import { ClassUtils } from "../utils/ClassUtils";
-import { BaseTexture } from "../resource/BaseTexture";
-import { getCompressTextureRenderCapable, TextureFormat } from "../RenderEngine/RenderEnum/TextureFormat";
-import { Browser } from "../utils/Browser";
-import { AssetDb } from "../resource/AssetDb";
-import { Resource } from "../resource/Resource";
-import { Utils } from "../utils/Utils";
-import { RenderTexture } from "../resource/RenderTexture";
-import { VideoTexture } from "../media/VideoTexture";
 import { LayaEnv } from "../../LayaEnv";
 import { LayaGL } from "../layagl/LayaGL";
+import { VideoTexture } from "../media/VideoTexture";
+import { ILoadTask, ILoadURL, IResourceLoader, Loader } from "../net/Loader";
 import { DDSTextureInfo } from "../RenderEngine/DDSTextureInfo";
+import { HDRTextureInfo } from "../RenderEngine/HDRTextureInfo";
+import { KTXTextureInfo } from "../RenderEngine/KTXTextureInfo";
 import { RenderTargetFormat } from "../RenderEngine/RenderEnum/RenderTargetFormat";
+import { TextureDimension } from "../RenderEngine/RenderEnum/TextureDimension";
+import { getCompressTextureRenderCapable, TextureFormat } from "../RenderEngine/RenderEnum/TextureFormat";
+import { AssetDb } from "../resource/AssetDb";
+import { BaseTexture } from "../resource/BaseTexture";
+import { RenderTexture } from "../resource/RenderTexture";
+import { Resource } from "../resource/Resource";
+import { Texture } from "../resource/Texture";
+import { Texture2D, TextureConstructParams, TexturePropertyParams } from "../resource/Texture2D";
+import { Browser } from "../utils/Browser";
+import { ClassUtils } from "../utils/ClassUtils";
+import { Utils } from "../utils/Utils";
 
 var internalResources: Record<string, Texture2D>;
 
@@ -47,6 +47,36 @@ export class Texture2DLoader implements IResourceLoader {
                     return this.load2(task, meta);
                 });
             }
+            //yanghui
+            else if (!meta && (task.ext === "png" || task.ext === "jpg" || task.ext === "ktx")) {
+                meta = {
+                    "type": 2,
+                    "sRGB": true,
+                    "wrapMode": 1,
+                    "filterMode": 1,
+                    "anisoLevel": 1,
+                    "mipmap": false,
+                    "pma": true,
+                    "files": [
+                        {
+                            "file": "",
+                            "format": 1,
+                            "ext": "png"
+                        },
+                        {
+                            "file": "1",
+                            "format": 19,
+                            "ext": "ktx"
+                        }
+                    ],
+                    "platforms": {
+                        "0": 0,
+                        "1": 1,
+                        "2": 1
+                    }
+                };
+            }
+            //yanghui
         }
 
         return this.load2(task, meta);
