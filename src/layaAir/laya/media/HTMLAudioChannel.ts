@@ -33,7 +33,9 @@ export class HTMLAudioChannel extends SoundChannel {
         this._loaded = true;
         let ele = this._ele;
         ele.onerror = (event: Event | string) => {
-            console.error("HTMLAudioChannel: ", event);
+            // console.error("HTMLAudioChannel: ", event);
+            // caochangli - 改成警告
+            console.warn("HTMLAudioChannel: ", event);
             this.stop();
         };
         ele.onended = () => this.onPlayEnd();
