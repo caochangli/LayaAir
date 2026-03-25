@@ -52,6 +52,33 @@ export class SoundManager {
     private static _musicChannel: SoundChannel = null;
     private static _channels: Set<SoundChannel> = new Set();
 
+    /**caochangli - 增加配音音乐类型 */
+    private static _dubMuted: boolean = false;
+    private static _dubVolume: number = 1;
+
+    /**caochangli - 类型音量(业务不可使用) */
+    static getTypeVolume(channel:SoundChannel):number
+    {
+        if (channel._isMusic)
+            return this.musicVolume;
+        if (channel._soundType == 1)
+            return this.soundVolume;
+        if (channel._soundType == 2)
+            return this.dubVolume;
+        return 1;
+    }
+    /**caochangli - 类型静音(业务不可使用) */
+    static getTypeMuted(channel:SoundChannel):boolean
+    {
+        if (channel._isMusic)
+            return this._muted || this._musicMuted;
+        if (channel._soundType == 1)
+            return this._muted || this._soundMuted;
+        if (channel._soundType == 2)
+            return this._muted || this._dubMuted;
+        return false;
+    }
+
     /**
      * @en Background music volume. default value is 1.
      * @zh 背景音乐音量。默认值为1。
@@ -81,17 +108,41 @@ export class SoundManager {
         value = MathUtil.clamp(value, 0, 1);
         if (value !== mgr._soundVolume) {
             mgr._soundVolume = value;
-            for (let channel of mgr._channels) {
-                if (channel !== mgr._musicChannel) {
-                    channel.volume = channel.volume;
-                }
+            // for (let channel of mgr._channels) {
+            //     if (channel !== mgr._musicChannel) {
+            //         channel.volume = channel.volume;
+            //     }
+            // }
+            this._setSoundVolume(1);
+        }
+    }
+
+    /**caochangli - 配音音量。默认值为1。*/
+    static get dubVolume(): number {
+        return mgr._dubVolume;
+    }
+
+    static set dubVolume(value: number) {
+        value = MathUtil.clamp(value, 0, 1);
+        if (value !== mgr._dubVolume) {
+            mgr._dubVolume = value;
+            this._setSoundVolume(2);
+        }
+    }
+
+    /**caochangli - 音效音量接口提取 */
+    private static _setSoundVolume(soundType:number)
+    {
+        for (let channel of mgr._channels) {
+            if (channel !== mgr._musicChannel && channel._soundType == soundType) {
+                channel.volume = channel.volume;
             }
         }
     }
 
     /**
      * @en Whether background music and all sound effects are muted.
-     * @zh 背景音乐和所有音效是否静音。
+     * @zh 背景音乐和所有音效和配音是否静音。
      */
     static get muted(): boolean {
         return mgr._muted;
@@ -107,7 +158,7 @@ export class SoundManager {
 
     /**
      * @en Whether all sound effects (excluding background music) are muted.
-     * @zh 所有音效（不包括背景音乐）是否静音。
+     * @zh 所有音效（不包括背景音乐和配音）是否静音。
      */
     static get soundMuted(): boolean {
         return mgr._soundMuted;
@@ -122,8 +173,23 @@ export class SoundManager {
     }
 
     /**
+     * 所有配音（不包括背景音乐和音效）是否静音。
+     */
+    static get dubMuted(): boolean {
+        return mgr._dubMuted;
+    }
+
+    static set dubMuted(value: boolean) {
+        value = !!value;
+        if (value !== mgr._dubMuted) {
+            mgr._dubMuted = value;
+            this.updateMutedStatus();
+        }
+    }
+
+    /**
      * @en Whether background music (excluding sound effects) is muted.
-     * @zh 背景音乐（不包括音效）是否静音。
+     * @zh 背景音乐（不包括音效和配音）是否静音。
      */
     static get musicMuted(): boolean {
         return mgr._musicMuted;
@@ -163,13 +229,53 @@ export class SoundManager {
         if (typeof (soundClass) === 'number')
             startTime = soundClass;
 
+        // let channel = PAL.media.createSoundChannel(url, false);
+        // channel._isMusic = false;
+        // channel._soundType = 1;
+        // channel.loops = loops ?? 1;
+        // channel.startTime = startTime ?? 0;
+        // channel.playbackRate = this.playbackRate;
+        // channel.volume = 1;
+        // channel.muted = mgr._soundMuted || mgr._muted;
+        // channel.completeHandler = complete;
+        // channel.play();
+        // return channel;
+        return this._playSound(url,loops,complete,startTime,1,mgr._soundMuted);
+    }
+
+    /**
+     * @zh 播放配音。配音可以同时播放多个。
+     * @param url 声音文件地址。
+     * @param loops 循环次数，0表示无限循环。
+     * @param complete 声音播放完成回调。
+     * @param startTime 声音播放起始时间。以秒为单位。
+     * @returns SoundChannel对象，通过此对象可以对声音进行控制，以及获取声音信息。
+     */
+    static playDub(url: string, loops?: number, complete?: () => void, startTime?: number): SoundChannel;
+    /** @deprecated */
+    static playDub(url: string, loops?: number, complete?: Handler, startTime?: number): SoundChannel;
+    /** @deprecated */
+    static playDub(url: string, loops?: number, complete?: Handler, soundClass?: new () => any, startTime?: number): SoundChannel;
+    static playDub(url: string, loops?: number, complete?: Handler | (() => void), soundClass?: (new () => any) | number, startTime?: number): SoundChannel {
+        if (!url)
+            return null;
+
+        if (typeof (soundClass) === 'number')
+            startTime = soundClass;
+
+        return this._playSound(url,loops,complete,startTime,2,mgr._dubMuted);
+    }
+
+    /**caochangli - 音效播放接口提取 */
+    private static _playSound(url: string, loops: number, complete: any, startTime: number, soundType:number, muted:boolean): SoundChannel {
         let channel = PAL.media.createSoundChannel(url, false);
         channel._isMusic = false;
+        channel._soundType = soundType;
         channel.loops = loops ?? 1;
         channel.startTime = startTime ?? 0;
         channel.playbackRate = this.playbackRate;
         channel.volume = 1;
-        channel.muted = mgr._soundMuted || mgr._muted;
+        channel.muted = muted || mgr._muted;
         channel.completeHandler = complete;
         channel.play();
         return channel;
@@ -203,6 +309,7 @@ export class SoundManager {
 
         let channel = PAL.media.createSoundChannel(url, mgr.useAudioMusic);
         channel._isMusic = true;
+        channel._soundType = 0;
         channel.loops = loops ?? 1;
         channel.startTime = startTime ?? 0;
         channel.playbackRate = this.playbackRate;
@@ -216,7 +323,7 @@ export class SoundManager {
     /**
      * @en Stop playing a specific sound. This method can stop the playback of any sound (including background music and sound effects) by providing the corresponding sound file address.
      * @param url The URL of the sound file.
-     * @zh 停止声音播放。此方法能够停止任意声音的播放（包括背景音乐和音效），只需传入对应的声音播放地址。
+     * @zh 停止声音播放。此方法能够停止任意声音的播放（包括背景音乐和音效和配音），只需传入对应的声音播放地址。
      * @param url 声音文件地址。
      */
     static stopSound(url: string): void {
@@ -232,7 +339,7 @@ export class SoundManager {
 
     /**
      * @en Stop playing all sounds (including background music and sound effects).
-     * @zh 停止播放所有声音（包括背景音乐和音效）。
+     * @zh 停止播放所有声音（包括背景音乐和音效和配音）。
      */
     static stopAll(): void {
         mgr._musicChannel = null;
@@ -242,11 +349,20 @@ export class SoundManager {
 
     /**
      * @en Stop playing all sound effects (excluding background music).
-     * @zh 停止播放所有音效（不包括背景音乐）。
+     * @zh 停止播放所有音效（不包括背景音乐和配音）。
      */
     static stopAllSound(): void {
         for (let channel of mgr._channels) {
-            if (channel !== mgr._musicChannel) {
+            if (channel !== mgr._musicChannel && channel._soundType == 1) {
+                channel.stop();
+            }
+        }
+    }
+
+    /**停止播放所有配音（不包括背景音乐和音效）。 */
+    static stopAllDub(): void {
+        for (let channel of mgr._channels) {
+            if (channel !== mgr._musicChannel && channel._soundType == 2) {
                 channel.stop();
             }
         }
@@ -254,7 +370,7 @@ export class SoundManager {
 
     /**
      * @en Stop playing background music (excluding sound effects).
-     * @zh 停止播放背景音乐（不包括音效）。
+     * @zh 停止播放背景音乐（不包括音效和配音）。
      */
     static stopMusic(): void {
         if (mgr._musicChannel)
@@ -300,13 +416,14 @@ export class SoundManager {
     }
 
     private static updateMutedStatus(): void {
-        let s = mgr._muted || mgr._soundMuted;
-        let m = mgr._muted || mgr._musicMuted;
+        // let s = mgr._muted || mgr._soundMuted;
+        // let m = mgr._muted || mgr._musicMuted;
         for (let channel of mgr._channels) {
-            if (channel === mgr._musicChannel)
-                channel.muted = m;
-            else
-                channel.muted = s;
+            // if (channel === mgr._musicChannel)
+            //     channel.muted = m;
+            // else
+            //     channel.muted = s;
+            channel.muted = this.getTypeMuted(channel);
         }
     }
 

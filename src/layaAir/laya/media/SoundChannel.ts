@@ -50,6 +50,8 @@ export class SoundChannel extends EventDispatcher {
 
     /** @internal */
     _isMusic: boolean = false;
+    /** @internal 音乐类型：0背景音乐 1音效 2配音 - caochangli*/
+    _soundType: number = 0;
     /** @internal */
     _autoResume: boolean = false;
 
@@ -68,7 +70,7 @@ export class SoundChannel extends EventDispatcher {
 
     set volume(value: number) {
         this._volumeSet = value;
-        let t = value * (this._isMusic ? SoundManager.musicVolume : SoundManager.soundVolume);
+        let t = value * SoundManager.getTypeVolume(this);//(this._isMusic ? SoundManager.musicVolume : SoundManager.soundVolume);
         if (t !== this._volume) {
             this._volume = t;
             if (this._loaded)
