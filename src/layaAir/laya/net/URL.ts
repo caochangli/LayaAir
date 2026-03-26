@@ -146,7 +146,15 @@ export class URL {
                 url = URL.customFormat(url);
 
             let ver = URL.version[url];
-            if (ver != null) {
+            //yanghui 压缩纹理取源文件版本号
+            if (!ver && url.indexOf("@1.ktx") !== -1) {
+                ver = URL.version[url.replace("@1.ktx", ".png")];
+                if (!ver) {
+                    ver = URL.version[url.replace("@1.ktx", ".jpg")];
+                }
+            }
+            //yanghui 压缩纹理取源文件版本号
+            if (ver != null && ver !== "") {
                 let i = url.lastIndexOf(".");
                 url = url.substring(0, i) + "-" + ver + url.substring(i);
             }
