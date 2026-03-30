@@ -303,6 +303,45 @@ export class Loader extends EventDispatcher {
      */
     static downloader = new Downloader();
 
+
+// caochangli
+    private static _textureMeta:any = 
+    {
+        "type": 2,
+        "sRGB": true,
+        "wrapMode": 1,
+        "filterMode": 1,
+        "anisoLevel": 1,
+        "mipmap": false,
+        "pma": true,
+        "files": [
+            {
+                "file": "",
+                "format": 1,
+                "ext": "png"
+            },
+            {
+                "file": "1",
+                "format": 19,
+                "ext": "ktx"
+            }
+        ],
+        "platforms": {
+            "0": 0,
+            "1": 1,
+            "2": 1
+        }
+    };
+    /**caochangli - 强制使用原图(默认根据平台使用原图或压缩纹理) */
+    static forceOrgImage:boolean = false;
+    /**caochangli - 纹理meta */
+    static get textureMeta():any {
+        let meta = this._textureMeta;
+        meta.platforms[1] = meta.platforms[2] = this.forceOrgImage ? 0 : 1;
+        return meta;
+    }
+// caochangli
+
     /**
      * @en Register a resource loader.
      * @param exts Extensions
@@ -718,6 +757,8 @@ export class Loader extends EventDispatcher {
             contentType: contentType,
             priority: options.priority ?? 1,
             retryCnt: 0,
+            // caochangli - 新增保存业务传递的cache缓存字段
+            cache:options && options.cache === false ? false : true,
             onProgress: onProgress,
             onComplete: null,
         };
@@ -1539,6 +1580,8 @@ interface DownloadItem {
     retryCnt?: number;
     silent?: boolean;
     startTime?: number;
+    // caochangli - 新增保存业务传递的cache缓存字段
+    cache: boolean;
     onComplete: (content: any) => void;
     onProgress: ProgressCallback;
 }

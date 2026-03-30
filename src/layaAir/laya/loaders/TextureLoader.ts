@@ -41,7 +41,7 @@ export class Texture2DLoader implements IResourceLoader {
 
         let meta: any;
         if (!task.url.startsWith("data:")) {
-            meta = AssetDb.inst.metaMap[task.url];
+            meta = Loader.forceOrgImage ? null : AssetDb.inst.metaMap[task.url];
             if (!meta && LayaEnv.isPreview) {
                 return AssetDb.inst.getMeta(task.url, task.uuid).then(meta => {
                     return this.load2(task, meta);
@@ -49,32 +49,7 @@ export class Texture2DLoader implements IResourceLoader {
             }
             //yanghui
             else if (!meta && (task.ext === "png" || task.ext === "jpg" || task.ext === "ktx")) {
-                meta = {
-                    "type": 2,
-                    "sRGB": true,
-                    "wrapMode": 1,
-                    "filterMode": 1,
-                    "anisoLevel": 1,
-                    "mipmap": false,
-                    "pma": true,
-                    "files": [
-                        {
-                            "file": "",
-                            "format": 1,
-                            "ext": "png"
-                        },
-                        {
-                            "file": "1",
-                            "format": 19,
-                            "ext": "ktx"
-                        }
-                    ],
-                    "platforms": {
-                        "0": 0,
-                        "1": 1,
-                        "2": 1
-                    }
-                };
+                meta = Loader.textureMeta;
             }
             //yanghui
         }

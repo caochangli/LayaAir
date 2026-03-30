@@ -73,7 +73,7 @@ export class MgDownloader extends Downloader {
                     this.readFile(cacheFilePath, contentType, onComplete);
             }
             else {
-                this.downloadFile(url, onProgress, (filePath: string, error: string) => {
+                this.downloadFile(owner,url, onProgress, (filePath: string, error: string) => {
                     if (filePath) {
                         if (contentType === "filePath")
                             onComplete(filePath);
@@ -97,7 +97,7 @@ export class MgDownloader extends Downloader {
             if (cacheFilePath)
                 super.image(owner, cacheFilePath, originalUrl, onProgress, onComplete);
             else {
-                this.downloadFile(url, onProgress, (filePath: string, error: string) => {
+                this.downloadFile(owner,url, onProgress, (filePath: string, error: string) => {
                     if (filePath)
                         super.image(owner, filePath, originalUrl, onProgress, onComplete);
                     else
@@ -140,13 +140,14 @@ export class MgDownloader extends Downloader {
         onProgress && loadTask.onProgressUpdate && loadTask.onProgressUpdate(res => onProgress(res.progress));
     }
 
-    protected downloadFile(url: string, onProgress: ProgressCallback, onComplete: DownloadCompleteCallback): void {
+    protected downloadFile(owner:any,url: string, onProgress: ProgressCallback, onComplete: DownloadCompleteCallback): void {
         let task = PAL.g.downloadFile({
             url: this.escapeURL(url),
             success: (res) => {
                 if (res.statusCode == null || res.statusCode === 200) {
                     let filePath = res.tempFilePath || (res as any).apFilePath; //淘宝用apFilePath
-                    if (this.cacheManager)
+                    //caochangli - 根据Laya.load中传递的cache判断是否进缓存
+                    if (this.cacheManager && (!owner || owner.cache !== false))
                         this.cacheManager.addFile(url, filePath);
                     onComplete(filePath);
                 }
