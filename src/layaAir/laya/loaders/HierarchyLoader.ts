@@ -1,8 +1,11 @@
-import { IResourceLoader, ILoadTask, Loader, ILoadOptions } from "../net/Loader";
+import { LayaEnv } from "../../LayaEnv";
+import { IResourceLoader, ILoadTask, Loader, ILoadOptions, ILoadURL } from "../net/Loader";
 import { URL } from "../net/URL";
 import { AssetDb } from "../resource/AssetDb";
 import { Prefab } from "../resource/HierarchyResource";
 import { IHierarchyParserAPI, PrefabImpl } from "../resource/PrefabImpl";
+import { AssetSystem } from "../sgsExpand/loader/AssetSystem";
+import { ArrayPool } from "../sgsExpand/pool/ArrayPool";
 
 export class HierarchyLoader implements IResourceLoader {
 
@@ -33,11 +36,83 @@ export class HierarchyLoader implements IResourceLoader {
         options.initiator = task;
         delete options.cache;
         delete options.ignoreCache;
+        //caochangli - 注释：处理提前+引用计数
+        // return task.loader.load(links, options, task.progress.createCallback()).then((resArray: any[]) => {
+        //     let res = new PrefabImpl(api, data);
+        //     res.fromDCC = fromDCC;
+        //     res.onLoad();
+        //     res.addDeps(resArray);
+        //     return res;
+        // });
+
+        //caochangli - 先把引用计数加上(防止加载过程中被回收)
+        let earlyList: Array<string> | undefined = undefined;
+        if (links && links.length > 0)
+        {
+            earlyList = ArrayPool.Get();
+            let assetSystem = AssetSystem.Ins;
+            let link:string | ILoadURL;
+            let loadPath:string;
+            if (LayaEnv.isPreview)
+            {
+                let promises: Promise<void>[] = [];
+                for (let i = 0,length = links.length; i < length; i++)
+                {
+                    link = links[i];
+                    if (!link) continue;
+                    loadPath = typeof link == "string" ? link : link.url;
+                    if (!loadPath) continue;
+
+                    promises.push(new Promise<void>((resolve) => {
+                        AssetDb.inst.uuidToUrl(loadPath, (uuid: string, url: string) => {
+                            assetSystem.AddReference(url);
+                            earlyList.push(url);
+                            resolve();
+                        });
+                    }));
+                }
+
+                return Promise.all(promises).then(() => {
+                    return this._load2(api,task,data,fromDCC,links,options,earlyList);
+                })
+            }
+
+            for (let i = 0,length = links.length; i < length; i++)
+            {
+                link = links[i];
+                if (!link) continue;
+                loadPath = typeof link == "string" ? link : link.url;
+                if (!loadPath) continue;
+                assetSystem.AddReference(loadPath);
+                earlyList.push(loadPath);
+            }
+        }
+        //caochangli - 先把引用计数加上(防止加载过程中被回收)
+
+        return this._load2(api,task,data,fromDCC,links,options);
+    }
+
+    private _load2(api:IHierarchyParserAPI,task:ILoadTask,data:any,fromDCC:boolean,links:Array<string | ILoadURL>,options:ILoadOptions,earlyList?:Array<string>):Promise<Prefab>
+    {
         return task.loader.load(links, options, task.progress.createCallback()).then((resArray: any[]) => {
             let res = new PrefabImpl(api, data);
             res.fromDCC = fromDCC;
             res.onLoad();
             res.addDeps(resArray);
+
+            //caochangli - 把先加上的计数减掉(res.addDeps会加上)
+            if (earlyList && earlyList.length > 0)
+            {
+                let assetSystem = AssetSystem.Ins;
+                for (let i = 0,length = earlyList.length; i < length; i++)
+                {
+                    assetSystem.DelReference(earlyList[i]);
+                }
+                ArrayPool.Release(earlyList);
+                earlyList = null;
+            }
+            //caochangli - 把先加上的计数减掉(res.addDeps会加上)
+
             return res;
         });
     }
