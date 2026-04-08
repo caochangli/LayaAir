@@ -538,10 +538,12 @@ export class HierarchyParser {
                             checkData(item);
                         }
                         // else if (typeof (item) === "string" && item.startsWith("i18n:")) {
-                        else if (typeStr === "string" && item.startsWith("i18n:")) {
-                            let i = item.indexOf(":", 5);
-                            if (i != -1)
-                                addInnerUrl(AssetDb.inst.getI18nSettingsURL(item.substring(5, i)), null);
+                        else if (typeStr === "string") {
+                            if (item.startsWith("i18n:")) {
+                                let i = item.indexOf(":", 5);
+                                if (i != -1)
+                                    addInnerUrl(AssetDb.inst.getI18nSettingsURL(item.substring(5, i)), null);
+                            }
                         }
                     }
                 } else {
@@ -549,11 +551,13 @@ export class HierarchyParser {
                     if (typeStr === "object") {
                         checkData(child);
                     }
-                    else if (typeStr === "string" && child.startsWith("i18n:")) {
-                        let i = child.indexOf(":", 5);
-                        if (i != -1)
-                            addInnerUrl(AssetDb.inst.getI18nSettingsURL(child.substring(5, i)), null);
-                    }
+                    else if (typeStr === "string") {
+                        if (child.startsWith("i18n:")) {
+                            let i = child.indexOf(":", 5);
+                            if (i != -1)
+                                addInnerUrl(AssetDb.inst.getI18nSettingsURL(child.substring(5, i)), null);
+                        }
+                    } 
                 }
             }
         }

@@ -32,6 +32,10 @@ export class HierarchyLoader implements IResourceLoader {
     protected _load(api: IHierarchyParserAPI, task: ILoadTask, data: any, fromDCC: boolean): Promise<Prefab> {
         let basePath = URL.getPath(task.url);
         let links = api.collectResourceLinks(data, basePath);
+        //caochangli - 没有依赖资源
+        if (!links || links.length <= 0)
+            return null;
+
         let options: ILoadOptions = Object.assign({}, task.options);
         options.initiator = task;
         delete options.cache;
@@ -45,47 +49,43 @@ export class HierarchyLoader implements IResourceLoader {
         //     return res;
         // });
 
-        //caochangli - 先把引用计数加上(防止加载过程中被回收)
-        let earlyList: Array<string> | undefined = undefined;
-        if (links && links.length > 0)
+        //caochangli - 先把引用计数加上(防止加载过程中被回收)        
+        let earlyList: Array<string> | undefined = ArrayPool.Get();
+        let assetSystem = AssetSystem.Ins;
+        let link:string | ILoadURL;
+        let loadPath:string;
+        if (LayaEnv.isPreview)
         {
-            earlyList = ArrayPool.Get();
-            let assetSystem = AssetSystem.Ins;
-            let link:string | ILoadURL;
-            let loadPath:string;
-            if (LayaEnv.isPreview)
-            {
-                let promises: Promise<void>[] = [];
-                for (let i = 0,length = links.length; i < length; i++)
-                {
-                    link = links[i];
-                    if (!link) continue;
-                    loadPath = typeof link == "string" ? link : link.url;
-                    if (!loadPath) continue;
-
-                    promises.push(new Promise<void>((resolve) => {
-                        AssetDb.inst.uuidToUrl(loadPath, (uuid: string, url: string) => {
-                            assetSystem.AddReference(url);
-                            earlyList.push(url);
-                            resolve();
-                        });
-                    }));
-                }
-
-                return Promise.all(promises).then(() => {
-                    return this._load2(api,task,data,fromDCC,links,options,earlyList);
-                })
-            }
-
+            let promises: Promise<void>[] = [];
             for (let i = 0,length = links.length; i < length; i++)
             {
                 link = links[i];
                 if (!link) continue;
                 loadPath = typeof link == "string" ? link : link.url;
                 if (!loadPath) continue;
-                assetSystem.AddReference(loadPath);
-                earlyList.push(loadPath);
+
+                promises.push(new Promise<void>((resolve) => {
+                    AssetDb.inst.uuidToUrl(loadPath, (uuid: string, url: string) => {
+                        assetSystem.AddReference(url);
+                        earlyList.push(url);
+                        resolve();
+                    });
+                }));
             }
+
+            return Promise.all(promises).then(() => {
+                return this._load2(api,task,data,fromDCC,links,options,earlyList);
+            })
+        }
+
+        for (let i = 0,length = links.length; i < length; i++)
+        {
+            link = links[i];
+            if (!link) continue;
+            loadPath = typeof link == "string" ? link : link.url;
+            if (!loadPath) continue;
+            assetSystem.AddReference(loadPath);
+            earlyList.push(loadPath);
         }
         //caochangli - 先把引用计数加上(防止加载过程中被回收)
 
