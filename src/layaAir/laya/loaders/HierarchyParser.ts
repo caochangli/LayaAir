@@ -529,6 +529,10 @@ export class HierarchyParser {
                 if (child == null)
                     continue;
                 if (Array.isArray(child)) {
+
+                    // if (key == "_$override")
+                    //     prefabChildOverride(data);
+
                     for (let item of child) {
                         if (item == null)
                             continue;
@@ -539,7 +543,8 @@ export class HierarchyParser {
                         }
                         // else if (typeof (item) === "string" && item.startsWith("i18n:")) {
                         else if (typeStr === "string") {
-                            if (item.startsWith("i18n:")) {
+                            if (key == "_$id" || key == "name" || key == "_$type") {}
+                            else if (item.startsWith("i18n:")) {
                                 let i = item.indexOf(":", 5);
                                 if (i != -1)
                                     addInnerUrl(AssetDb.inst.getI18nSettingsURL(item.substring(5, i)), null);
@@ -552,10 +557,20 @@ export class HierarchyParser {
                         checkData(child);
                     }
                     else if (typeStr === "string") {
-                        if (child.startsWith("i18n:")) {
-                            let i = child.indexOf(":", 5);
-                            if (i != -1)
-                                addInnerUrl(AssetDb.inst.getI18nSettingsURL(child.substring(5, i)), null);
+                        if (key == "_$id" || key == "name" || key == "_$type" || key == "_$prefab") {}
+                        else {
+                            // if (data._$prefab) {
+                            //     prefabOverride(key,child);
+                            // }
+                            // if (key == "_$override") {
+                            //     prefabChildOverride(data);
+                            // }
+                            // else 
+                                if (child.startsWith("i18n:")) {
+                                let i = child.indexOf(":", 5);
+                                if (i != -1)
+                                    addInnerUrl(AssetDb.inst.getI18nSettingsURL(child.substring(5, i)), null);
+                            }
                         }
                     } 
                 }
@@ -563,6 +578,41 @@ export class HierarchyParser {
         }
 
         // caochangli - 补充资源依赖处理
+        function prefabOverride(key:string,value:string) {
+            let ext = Utils.getFileExtension(value);
+            if (ext)
+            {
+                if (ext == "png" || ext == "jpg")
+                {
+
+                }
+                else if (ext == "skel")
+                {
+                    
+                }
+            }
+        }
+        function prefabChildOverride(data:any) {
+            for (let key in data) {
+                let value = data[key];
+                if (!value || key == "_$override")
+                    continue;
+                if (typeof (value) !== "string")
+                    continue;
+                let ext = Utils.getFileExtension(value);
+                if (ext)
+                {
+                    if (ext == "png" || ext == "jpg")
+                    {
+
+                    }
+                    else if (ext == "skel")
+                    {
+
+                    }
+                }
+            }
+        }
         function supplementInner(type:string,data:any) {
             if (type == "Sprite") {
                 if (data.texture)
