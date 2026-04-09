@@ -19,7 +19,15 @@ function myTrace(msg) {
 function loadImage2(url, options) {
     var failed = false;
     var xhr = new XMLHttpRequest;
-    xhr.open("GET", url, true);
+    // xhr.open("GET", url, true);
+
+    //caochangli - 相对路径下载时因workerloader.js脚本在libs中，导致下载地址错误
+    var sendUrl = url;
+    if (webHost && !sendUrl.startsWith("http://") && !sendUrl.startsWith("https://"))
+        sendUrl = `${webHost}${url}`;
+    xhr.open("GET", sendUrl, true);
+    //caochangli - 相对路径下载时因workerloader.js脚本在libs中，导致下载地址错误
+
     xhr.responseType = "arraybuffer";
     myTrace("load:" + url);
     xhr.onload = function () {
@@ -103,4 +111,23 @@ function showMsgToMain(msg) {
     data.type = "Msg";
     data.msg = msg;
     postMessage(data);
+}
+
+
+//caochangli - 解决workerloader.js脚本在/libs目录下，导致相对路径下载的资源多套了一层libs路径
+var webHost = "";//当前网页路径
+if (location && location.protocol && location.host && location.pathname)
+{
+    webHost = getPath(location.protocol + "//" + location.host + location.pathname);
+    if (webHost.endsWith("/libs/"))
+    {
+        var index = webHost.lastIndexOf('/libs/');
+        if (index !== -1)
+            webHost = webHost.substring(0, index + 1);
+    }
+}
+
+function getPath(url) {
+    var ofs = url.lastIndexOf('/');
+    return ofs > 0 ? url.substring(0, ofs + 1) : "";
 }
