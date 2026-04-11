@@ -2669,8 +2669,23 @@ export class Sprite extends Node {
 
 //#region caochangli - 功能扩展
 
+//#region ui节点支持自定义类
+    protected _customScript:string = "";
+    get customScript(): string
+    {
+        return this._customScript;
+    }
+    set customScript(value: string)
+    {
+        if (value == null) value = "";
+        if (this._customScript == value)
+            return;
+        this._customScript = value;
+    }
+//#endregion ui节点支持自定义类
+
 //#region loadImage相关
-    
+
     // caochangli - set texture提到此处，解决停止加载功能冲突
     private _setTexture(value: Texture) {
         this._texture && this._texture._removeReference();

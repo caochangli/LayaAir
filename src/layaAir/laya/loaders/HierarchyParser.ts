@@ -116,7 +116,16 @@ export class HierarchyParser {
                     }
                 }
                 else if (pstr = nodeData._$type) {
-                    let cls = ClassUtils.getClass(pstr);
+                    //caochangli - UI节点指定了自定义类，使用自定义类实例
+                    let customScript = nodeData.customScript;
+                    if (customScript) {
+                        if (LayaEnv.isPreview && customScript.startsWith("res://"))
+                            customScript = customScript.substring(6);
+                        customScript = ClassUtils.getClass(customScript);
+                        if (!customScript)
+                            errors.push(new Error(`missing customScript class '${nodeData.customScript}'`));
+                    }
+                    let cls = customScript || ClassUtils.getClass(pstr);
                     if (cls) {
                         try {
                             node = new cls();
@@ -203,7 +212,7 @@ export class HierarchyParser {
             let runtime = data._$runtime;
             if (runtime) {
                 hasRuntime = true;
-                if (runtime.startsWith("res://"))
+                if (LayaEnv.isPreview && runtime.startsWith("res://"))
                     runtime = runtime.substring(6);
                 runtime = ClassUtils.getClass(runtime);
                 if (!runtime)
