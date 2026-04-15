@@ -278,6 +278,11 @@ export class GButton extends GLabel {
         }
     }
 
+    /**caochangli - 仅设置MouseEnabled:SButton中mouseEnabled不需要改变_over和setCurrentState */
+    onlySetMouseEnabled(value:boolean) {
+        super.mouseEnabled = value;
+    }
+
     /**
      * @en Simulates a click on the button, optionally applying a down effect and triggering a click call.
      * @param downEffect Whether to apply a down effect when simulating the click. Default is false.
