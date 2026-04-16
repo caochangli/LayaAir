@@ -376,6 +376,11 @@ export class InputManager {
         else if (type == 4) {
             if (InputManager.mouseEventsEnabled) {
                 touch.event.delta = (<WheelEvent>ev).deltaY * 0.025;
+                
+                // caochangli - 新增舞台鼠标滚动事件，解决Scroller中对wheel事件进行了stopPropagation，导致stage对象收不到wheel事件
+                ILaya.stage.event(Event.STAGE_MOUSE_WHEEL,touch.event);
+                // caochangli - 新增舞台鼠标滚动事件，解决Scroller中对wheel事件进行了stopPropagation，导致stage对象收不到wheel事件
+
                 touch.bubble(Event.MOUSE_WHEEL);
                 touch.event.delta = 0;
             }

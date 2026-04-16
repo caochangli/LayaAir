@@ -379,6 +379,12 @@ export class Event {
      */
     static readonly UPDATE_PHY_EVENT_FILTER = "physics3dEventFilter";
 
+
+    /**
+     * caochangli - 新增舞台鼠标滚动事件，解决Scroller中对wheel事件进行了stopPropagation，导致stage对象收不到wheel事件
+     */
+    static readonly STAGE_MOUSE_WHEEL = "stageMousewheel";
+
     /**
      * @en Checks whether the specified event type is a mouse event.
      * @param type The type of the event.
