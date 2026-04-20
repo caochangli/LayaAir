@@ -129,6 +129,9 @@ export class HierarchyParser {
                     if (cls) {
                         try {
                             node = new cls();
+                            (node as any)["__isDeserialized"] = true;
+                            if ((node as any).initCT)
+                                (node as any).initCT();
                         }
                         catch (err: any) {
                             errors.push(err);
@@ -227,8 +230,12 @@ export class HierarchyParser {
                     node = options.clsIns;
                     delete options.clsIns;
                 }
-                else
+                else {
                     node = new runtime();
+                    (node as any)["__isDeserialized"] = true;
+                    if ((node as any).initCT)
+                        (node as any).initCT();
+                }
                 if (!(node instanceof Node)) {
                     errors.push(new Error(`runtime class invalid - '${runtime}', must derive from Node`));
                     node = null;
