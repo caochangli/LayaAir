@@ -408,7 +408,7 @@ export class GComboBox extends GLabel {
         this.showDropdown();
     }
 
-    protected _mouseup(): void {
+    protected _mouseup(evt: Event): void {
         if (this._down) {
             this._down = false;
             this.setCurrentState();
