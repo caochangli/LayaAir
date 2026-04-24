@@ -118,6 +118,8 @@ export class ImageRenderer {
             this._drawCmd.texture = this._tex;
             if (drawClass === DrawTrianglesCmd)
                 (this._drawCmd as DrawTrianglesCmd).mesh = this._meshFactory;
+            else if (drawClass === Draw9GridTextureCmd)//caochangli - 是九宫格渲染的情况下，调整九宫格参数
+                (this._drawCmd as Draw9GridTextureCmd).sizeGrid = this._tex._sizeGrid || this._sizeGrid;
             this._owner.graphics.repaint();
             return;
         }
