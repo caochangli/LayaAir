@@ -54,7 +54,9 @@ export class HttpRequest extends EventDispatcher {
             }
             else {
                 if (!hasContentType) http.setRequestHeader("Content-Type", "application/json");
-                if (!(data instanceof ArrayBuffer))
+                // if (!(data instanceof ArrayBuffer))
+                // caochangli - 某些接口（如上传文件）需要原生发送 FormData
+                if (!(data instanceof ArrayBuffer) && (typeof FormData === "undefined" || !(data instanceof FormData)))
                     data = JSON.stringify(data);
             }
         }
