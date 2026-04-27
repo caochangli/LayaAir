@@ -47,8 +47,8 @@ export class Texture2DLoader implements IResourceLoader {
                     return this.load2(task, meta);
                 });
             }
-            //yanghui
-            else if (!meta && (task.ext === "png" || task.ext === "jpg" || task.ext === "ktx")) {
+            //yanghui - 理论上不在版库中的文件，只有是项目管理的资源才需要补充meta，其他不需要，比如：https://**
+            else if (!meta && (task.ext === "png" || task.ext === "jpg" || task.ext === "ktx") && task.url.startsWith("res/")) {
                 meta = Loader.textureMeta;
             }
             //yanghui
