@@ -55,7 +55,7 @@ class AtlasLoader implements IResourceLoader {
                         continue;
 
                     let url = baseUrl + directory + (obj.filename || name);
-                    let tt = Texture.create(tPic, obj.frame.x, obj.frame.y, obj.frame.w, obj.frame.h, obj.spriteSourceSize.x, obj.spriteSourceSize.y, obj.sourceSize.w, obj.sourceSize.h);
+                    let tt = Texture.create(tPic, obj.frame.x, obj.frame.y, obj.frame.w, obj.frame.h, obj.spriteSourceSize.x, obj.spriteSourceSize.y, obj.sourceSize.w, obj.sourceSize.h, obj.rotated);
                     tt._sizeGrid = obj.sizeGrid;
                     tt._stateNum = obj.stateNum;
                     task.loader.cacheRes(url, tt);

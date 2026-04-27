@@ -63,6 +63,10 @@ export class Texture extends Resource {
      */
     sourceHeight: number = 0;
     /**
+     * caochangli - 增加图集中散图是否旋转标记
+     */
+    rotated: boolean = false;
+    /**
      * @en The URL of the texture image.
      * @zh 纹理图片的地址。
      */
@@ -122,12 +126,25 @@ export class Texture extends Resource {
      * @param offsetY Y 轴偏移量（可选）。
      * @param sourceWidth 原始宽度，包括被裁剪的透明区域（可选）。
      * @param sourceHeight 原始高度，包括被裁剪的透明区域（可选）。
+     * @param rotated 是否向右顺时针旋转了90度（可选）。
      * @return `Texture` 对象。
      */
     static create(source: Texture | BaseTexture, x: number, y: number, width: number, height: number,
         offsetX: number = 0, offsetY: number = 0,
-        sourceWidth: number = 0, sourceHeight: number = 0): Texture {
-        return Texture._create(source, x, y, width, height, offsetX, offsetY, sourceWidth, sourceHeight);
+        sourceWidth: number = 0, sourceHeight: number = 0, rotated: boolean = false): Texture {
+        return Texture._create(source, x, y, width, height, offsetX, offsetY, sourceWidth, sourceHeight, null, rotated);
+    }
+
+    /**caochangli - 旋转本地UV，解决图集中散图旋转问题 */
+    static rotateLocalUV(u:number, v:number, minU:number, minV:number, maxU:number, maxV:number):Array<number>
+    {
+        let su = maxU - minU;
+        let sv = maxV - minV;
+        let lu = (u - minU) / su;
+        let lv = (v - minV) / sv;
+        let ru = 1 - lv;
+        let rv = lu;
+        return [ru * su + minU,rv * sv + minV];
     }
 
     /**
@@ -143,11 +160,12 @@ export class Texture extends Resource {
      * @param sourceWidth 原始宽度，包括被裁剪的透明区域（可选）。
      * @param sourceHeight 原始高度，包括被裁剪的透明区域（可选）。
      * @param outTexture 返回的Texture对象。
+     * @param rotated 是否向右顺时针旋转了90度（可选）。
      * @return  <code>Texture</code> 对象。
      */
     static _create(source: Texture | BaseTexture, x: number, y: number, width: number, height: number,
         offsetX: number = 0, offsetY: number = 0,
-        sourceWidth: number = 0, sourceHeight: number = 0, outTexture: Texture = null): Texture {
+        sourceWidth: number = 0, sourceHeight: number = 0, outTexture: Texture = null, rotated: boolean = false): Texture {
         var btex: boolean = source instanceof Texture;
         var uv = btex ? ((<Texture>source)).uv : Texture.DEF_UV;
         var bitmap = btex ? ((<Texture>source)).bitmap : <Texture2D>source;
@@ -163,10 +181,11 @@ export class Texture extends Resource {
         } else {
             tex = new Texture(bitmap, null, sourceWidth || width, sourceHeight || height)
         }
-        tex.width = width;
-        tex.height = height;
+        tex.width = rotated ? height : width;
+        tex.height = rotated ? width : height;
         tex.offsetX = offsetX;
         tex.offsetY = offsetY;
+        tex.rotated = rotated;
 
         var dwidth: number = 1 / bitmap.width;
         var dheight: number = 1 / bitmap.height;
@@ -178,11 +197,28 @@ export class Texture extends Resource {
         var u1: number = tex.uv[0], v1: number = tex.uv[1], u2: number = tex.uv[4], v2: number = tex.uv[5];
         var inAltasUVWidth: number = (u2 - u1), inAltasUVHeight: number = (v2 - v1);
         var oriUV: any[] = moveUV(uv[0], uv[1], [x, y, x + width, y, x + width, y + height, x, y + height]);
-        tex.uv = new Float32Array([u1 + oriUV[0] * inAltasUVWidth, v1 + oriUV[1] * inAltasUVHeight,
-        u2 - (1 - oriUV[2]) * inAltasUVWidth, v1 + oriUV[3] * inAltasUVHeight,
-        u2 - (1 - oriUV[4]) * inAltasUVWidth, v2 - (1 - oriUV[5]) * inAltasUVHeight,
-        u1 + oriUV[6] * inAltasUVWidth, v2 - (1 - oriUV[7]) * inAltasUVHeight]);
-
+        if (!rotated) {
+            tex.uv = new Float32Array([u1 + oriUV[0] * inAltasUVWidth, v1 + oriUV[1] * inAltasUVHeight,
+            u2 - (1 - oriUV[2]) * inAltasUVWidth, v1 + oriUV[3] * inAltasUVHeight,
+            u2 - (1 - oriUV[4]) * inAltasUVWidth, v2 - (1 - oriUV[5]) * inAltasUVHeight,
+            u1 + oriUV[6] * inAltasUVWidth, v2 - (1 - oriUV[7]) * inAltasUVHeight]);
+        }
+        // caochangli - 处理向右旋转了90的图集散图
+        else {
+            var uvList = [u1 + oriUV[0] * inAltasUVWidth, v1 + oriUV[1] * inAltasUVHeight,
+            u2 - (1 - oriUV[2]) * inAltasUVWidth, v1 + oriUV[3] * inAltasUVHeight,
+            u2 - (1 - oriUV[4]) * inAltasUVWidth, v2 - (1 - oriUV[5]) * inAltasUVHeight,
+            u1 + oriUV[6] * inAltasUVWidth, v2 - (1 - oriUV[7]) * inAltasUVHeight];
+            for (let i = 0; i < 8; i+=2)
+            {
+                let rotated = Texture.rotateLocalUV(uvList[i],uvList[i+1],x,y,x+width,y+height);
+                uvList[i] = rotated[0];
+                uvList[i+1] = rotated[1];
+            }
+            tex.uv = new Float32Array(uvList);
+        }
+        // caochangli - 处理向右旋转了90的图集散图
+        
         var bitmapScale: number = (<Texture>source).scaleRate;
         if (bitmapScale && bitmapScale != 1) {
             tex.sourceWidth /= bitmapScale;

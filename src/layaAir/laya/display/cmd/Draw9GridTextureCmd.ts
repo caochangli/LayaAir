@@ -164,9 +164,18 @@ export class Draw9GridTextureCmd implements IGraphicsCmd {
                     const clippedData = UVClippingUtils.clipTrianglesByUVRange(
                         vb.getVertices(), vb.getIndices(), vb.getUVs(), this.texture.uvrect, vb.getColors()
                     );
-                    runner.drawTriangles(this.texture, x + gx, y + gy,
-                        clippedData.vertices, clippedData.uvs, clippedData.indices,
-                        null, 1, null, null, clippedData.colors, null);
+                    let uvs = clippedData.uvs;
+                    // caochangli - 处理向右旋转了90的图集散图
+                    if (this.texture.rotated) {
+                        let tmpUVs:any = [];
+                        for (let i = 0,length = uvs.length; i < length; i+=2) {
+                            let rotates = Texture.rotateLocalUV(uvs[i], uvs[i+1], vb.uvRect.x,vb.uvRect.y,vb.uvRect.x+vb.uvRect.width,vb.uvRect.y+vb.uvRect.height);
+                            tmpUVs = tmpUVs.concat(rotates);
+                        }
+                        uvs = tmpUVs;
+                    }
+                    // caochangli - 处理向右旋转了90的图集散图
+                    runner.drawTriangles(this.texture, x + gx, y + gy, clippedData.vertices, uvs, clippedData.indices, null, 1, null, null, clippedData.colors, null);
                 } else {
                     runner.drawTriangles(this.texture, x + gx, y + gy, vb.getVertices(), vb.getUVs(), vb.getIndices(),
                         null, 1, null, null, vb.getColors(), this.texture.uvrect);
