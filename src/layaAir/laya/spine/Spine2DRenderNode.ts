@@ -627,7 +627,7 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
         }
     }
 
-    private _update(): void {
+    protected _update(): void {
         this._timeKeeper.update();
         let state = this._state;
         let delta = this._timeKeeper.delta * this._playbackRate;
