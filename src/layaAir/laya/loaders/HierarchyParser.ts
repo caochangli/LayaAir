@@ -32,6 +32,9 @@ export class HierarchyParser {
         let overrideData: Array<Array<any>>;
         let hasRuntime: boolean;
         let hasUI: boolean;
+        //#region liurui 记录自定义类节点，方便后续绑定
+        let customScriptNodesObj: Record<string, Node[]> = {};
+        //#endregion liurui 记录自定义类节点，方便后续绑定
 
         if (options) {
             inPrefab = options.inPrefab;
@@ -41,21 +44,31 @@ export class HierarchyParser {
             overrideData = options.overrideData;
         }
 
-        function createChildren(data: any, prefab: Node) {
+        function createChildren(data: any, prefab: Node, customScript?: string) {
+            //#region liurui 记录自定义类节点，方便后续绑定
             for (let child of data._$child) {
+                let node;
                 if (child._$child) {
-                    let node = createNode(child, prefab);
-                    createChildren(child, child._$prefab ? node : prefab);
-
-                    dataList.push(child);
-                    allNodes.push(node);
+                    node = createNode(child, prefab);
+                    createChildren(child, child._$prefab ? node : prefab, data.customScript);
                 }
                 else {
-                    let node = createNode(child, prefab);
+                    node = createNode(child, prefab);
+                }
+                if (child && node) {
+                    customScript = customScript || data.customScript;
+                    if (customScript) {
+                        // 自定义类绑定子节点
+                        if (!customScriptNodesObj[customScript])
+                            customScriptNodesObj[customScript] = [];
+                        customScriptNodesObj[customScript].push(node);
+                        (node as any).__isNotNeedBindToTopNode = true;
+                    }
                     dataList.push(child);
                     allNodes.push(node);
                 }
             }
+            //#endregion liurui 记录自定义类节点，方便后续绑定
         }
 
         function createNode(nodeData: any, prefab: Node): Node {
@@ -410,7 +423,20 @@ export class HierarchyParser {
 
                 if (hasRuntime && nodeData._$var && node.name) {
                     try {
-                        (<any>topNode)[node.name] = node;
+                        //#region liurui 绑定节点
+                        if (!(node as any).__isNotNeedBindToTopNode) {
+                            // 如果存在自定义类，则说明不需要把这个绑定到topNode中，会在下面绑定到自定义类里面
+                            (<any>topNode)[node.name] = node;
+                        }
+                        // 检测是否是自定义类，如果是，则绑定到自定义类里面
+                        if ((node as any)._customScript && customScriptNodesObj[(node as any)._customScript]) {
+                            let customScriptNodes = customScriptNodesObj[(node as any)._customScript];
+                            for (let n of customScriptNodes) {
+                                (<any>node)[n.name] = n;
+                            }
+                            delete customScriptNodesObj[(node as any)._customScript];
+                        }
+                        //#endregion liurui 绑定节点
                     }
                     catch (err: any) {
                         errors.push(err);
