@@ -656,6 +656,7 @@ export class Tween {
      * @return Tween对象。 
      */
     kill(complete?: boolean): void {
+        this._head = -1;
         if (this._queue.length == 0)
             return;
 
@@ -673,7 +674,7 @@ export class Tween {
             }
         }
 
-        this._head = -1;
+        // this._head = -1;
         this._cur = null;
         this._queue.length = 0;
 
