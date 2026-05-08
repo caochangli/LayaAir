@@ -55,9 +55,9 @@ export class HierarchyParser {
                 else {
                     node = createNode(child, prefab);
                 }
-                if (child && node) {
+                if (child) {
                     customScript = customScript || data.customScript;
-                    if (customScript) {
+                    if (customScript && node) {
                         // 自定义类绑定子节点
                         if (!customScriptNodesObj[customScript])
                             customScriptNodesObj[customScript] = [];
