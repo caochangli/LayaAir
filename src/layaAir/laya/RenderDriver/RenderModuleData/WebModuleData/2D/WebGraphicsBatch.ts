@@ -19,6 +19,7 @@ import { WebRender2DPass } from "./WebRender2DPass";
 import { ShaderDefines2D } from "../../../../webgl/shader/d2/ShaderDefines2D";
 import { IRenderGeometryElement } from "../../../DriverDesign/RenderDevice/IRenderGeometryElement";
 import { Vector4 } from "../../../../maths/Vector4";
+import { Spine2DRenderNode } from "../../../../spine/Spine2DRenderNode";
 
 
 /**
@@ -307,6 +308,18 @@ class BatchContext {
      * @internal caochangli - WebGL 检查元素是否与批次兼容 - 0不能调换位置 1可调整位置 2可调整位置且合批
      */
     _isCompatibleWebgl2(element: IPrimitiveRenderElement2D): number {
+        let isCompatible = this._isCompatibleWebgl(element);
+        // 可以合批直接返回 2
+        if (isCompatible)
+            return 2;
+        let ownerRenderFlag = element.owner.renderFlag;
+        //renderFlag相同 - 后续如果有问题，可使用下面的方案
+        if (ownerRenderFlag && this.renderFlag && ownerRenderFlag == this.renderFlag)
+            return 1;
+        return 0;
+
+
+        // ------更精准的根据不同条件判断是否可以调位置
         if (this.type & 32)
             return 0;
 
@@ -318,26 +331,36 @@ class BatchContext {
             return 0;
         }
 
+        // 是否可以cd合批
+        let isDcMerg = true;
+
+        // 渲染标记
+        let renderFlag = element.owner.renderFlag;
+        let isRenderFlagSame = renderFlag && this.renderFlag && renderFlag == this.renderFlag ? true : false;
+
         let elementLowType = elementType & 63;
         let elementTexId = elementType & (~63);
         // 纹理检查放最前，因为这是文字的图片的差别
-        let texSame = elementTexId !== 0 && elementTexId !== this.textureId && this.textureId !== 0 ? false : true;
-        if (!texSame) {
-            let renderFlag = element.owner.renderFlag;
-            if (!renderFlag || !this.renderFlag || renderFlag != this.renderFlag)
+        if (elementTexId !== 0 && elementTexId !== this.textureId && this.textureId !== 0) {
+            if (!isRenderFlagSame)
                 return 0;
+            isDcMerg = false;
         }
 
         // 检查低位类型（最常见的不匹配）
         if (this.lowType !== elementLowType) {
-            return 0;
+            if (!isRenderFlagSame)
+                return 0;
+            isDcMerg = false;
         }
 
         let elementOwner = element.owner as WebRenderStruct2D;
 
         // 检查透明度（数值比较，较快）
         if (this.globalAlpha !== elementOwner.globalAlpha) {
-            return 0;
+            if (!isRenderFlagSame)
+                return 0;
+            isDcMerg = false;
         }
 
         // 检查对象引用（指针比较，较快）
@@ -370,7 +393,7 @@ class BatchContext {
             this.primitiveShaderData = element.primitiveShaderData;
         }
 
-        return texSame ? 2 : 1;
+        return isDcMerg ? 2 : 1;
     }
 
     /**
@@ -444,6 +467,18 @@ class BatchContext {
      * @internal caochangli - WebGPU 检查元素是否与批次兼容 - 0不能调换位置 1可调整位置 2可调整位置且合批
      */
     _isCompatibleWebgpu2(element: IPrimitiveRenderElement2D): number {
+        let isCompatible = this._isCompatibleWebgpu(element);
+        // 可以合批直接返回 2
+        if (isCompatible)
+            return 2;
+        let ownerRenderFlag = element.owner.renderFlag;
+        //renderFlag相同 - 后续如果有问题，可使用下面的方案
+        if (ownerRenderFlag && this.renderFlag && ownerRenderFlag == this.renderFlag)
+            return 1;
+        return 0;
+        
+
+        // ------更精准的根据不同条件判断是否可以调位置
         if (this.type & 32)
             return 0;
 
@@ -455,23 +490,36 @@ class BatchContext {
             return 0;
         }
 
+        // 是否可以cd合批
+        let isDcMerg = true;
+
+        // 渲染标记
+        let renderFlag = element.owner.renderFlag;
+        let isRenderFlagSame = renderFlag && this.renderFlag && renderFlag == this.renderFlag ? true : false;
+
         let elementLowType = elementType & 63;
         let elementTexId = elementType & (~63);
         // 纹理检查放最前，因为这是文字的图片的差别
-        let texSame = elementTexId !== 0 && elementTexId !== this.textureId && this.textureId !== 0 ? false : true;
-        if (!texSame)
-            return 0;
+        if (elementTexId !== 0 && elementTexId !== this.textureId && this.textureId !== 0) {
+            if (!isRenderFlagSame)
+                return 0;
+            isDcMerg = false;
+        }
 
         // 检查低位类型（最常见的不匹配）
         if (this.lowType !== elementLowType) {
-            return 0;
+            if (!isRenderFlagSame)
+                return 0;
+            isDcMerg = false;
         }
 
         let elementOwner = element.owner as WebRenderStruct2D;
 
         // 检查透明度（数值比较，较快）
         if (this.globalAlpha !== elementOwner.globalAlpha) {
-            return 0;
+            if (!isRenderFlagSame)
+                return 0;
+            isDcMerg = false;
         }
 
         // 检查对象引用（指针比较，较快）
@@ -505,7 +553,7 @@ class BatchContext {
             this.primitiveShaderData = primitiveShaderData;
         }
 
-        return texSame ? 2 : 1;
+        return isDcMerg ? 2 : 1;
     }
 
     /**
@@ -598,6 +646,12 @@ export class WebGraphicsBatch implements IBatch2DProvider {
             //                 var text = (elementOwnerOwner as any)._text;
             //                 if (text !== null && text !== undefined)
             //                     dcList.push(text);
+            //                 else
+            //                 {
+            //                     var spine = (elementOwnerOwner as any).getComponent(Spine2DRenderNode);
+            //                     if (spine && spine._templet)
+            //                         dcList.push(spine._templet.url);
+            //                 }
             //             }
             //         }
             //     }
@@ -733,6 +787,12 @@ export class WebGraphicsBatch implements IBatch2DProvider {
             //                     var text = (elementOwnerOwner as any)._text;
             //                     if (text !== null && text !== undefined)
             //                         dcList.push(text);
+            //                     else
+            //                     {
+            //                         var spine = (elementOwnerOwner as any).getComponent(Spine2DRenderNode);
+            //                         if (spine && spine._templet)
+            //                             dcList.push(spine._templet.url);
+            //                     }
             //                 }
             //             }
             //         }
