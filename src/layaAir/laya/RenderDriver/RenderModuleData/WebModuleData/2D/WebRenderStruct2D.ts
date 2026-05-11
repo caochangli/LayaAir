@@ -124,12 +124,8 @@ export class WebRenderStruct2D implements IRenderStruct2D {
    }
 
    // caochangli - 增加渲染标记
-   private _renderFlag:string = "";
-   set renderFlag(value:string) {
-      this._renderFlag = value;
-   }
    get renderFlag():string {
-       return this._renderFlag;
+      return this.owner ? this.owner.renderFlag : "";
    }
 
    get inheritedDcOptimize(): boolean {

@@ -1038,18 +1038,19 @@ export class Sprite extends Node {
     }
 
     /**caochangli - 增加渲染标记(用于列表中且drawCallOptimize=true是远程资源打断后续元素合批问题) */
+    private _renderFlag:string = "";
     public set renderFlag(value:string)
     {
         if (value == null) value = "";
-        if (this._struct.renderFlag === value)
+        if (this._renderFlag === value)
             return;
-        this._struct.renderFlag = value;
+        this._renderFlag = value;
         this._struct.setRepaint();
         this.parentRepaint();
     }
     public get renderFlag():string
     {
-        return this._struct.renderFlag;
+        return this._renderFlag;
     }
 
     /**
