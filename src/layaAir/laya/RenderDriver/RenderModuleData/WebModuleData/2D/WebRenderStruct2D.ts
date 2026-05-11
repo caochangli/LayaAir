@@ -123,6 +123,15 @@ export class WebRenderStruct2D implements IRenderStruct2D {
       this.updateChildren(ChildrenUpdateType.DcOptimize);
    }
 
+   // caochangli - 增加渲染标记
+   private _renderFlag:string = "";
+   set renderFlag(value:string) {
+      this._renderFlag = value;
+   }
+   get renderFlag():string {
+       return this._renderFlag;
+   }
+
    get inheritedDcOptimize(): boolean {
       // 获取准确数据
       return this._dcOptimize || this._parentData.dcOptimize;

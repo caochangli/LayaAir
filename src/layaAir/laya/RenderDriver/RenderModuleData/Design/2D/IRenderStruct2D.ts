@@ -62,6 +62,9 @@ export interface IRenderStruct2D {
    dcOptimize: boolean;
    readonly inheritedDcOptimize: boolean;
 
+   /**caochangli - 增加渲染标记 */
+   renderFlag:string
+
    //渲染数据
    isRenderStruct: boolean;
 

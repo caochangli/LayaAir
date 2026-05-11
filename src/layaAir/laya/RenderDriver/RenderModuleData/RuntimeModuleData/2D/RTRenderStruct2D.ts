@@ -64,6 +64,15 @@ export class RTRenderStruct2D implements IRenderStruct2D {
       this._nativeObj.setDcOptimize(value);
    }
 
+   // caochangli - 增加渲染标记
+   private _renderFlag:string = "";
+   set renderFlag(value:string) {
+      this._renderFlag = value;
+   }
+   get renderFlag():string {
+       return this._renderFlag;
+   }
+
    public get inheritedDcOptimize(): boolean {
       if (this._nativeObj.getInheritedDcOptimize) {
          return this._nativeObj.getInheritedDcOptimize();

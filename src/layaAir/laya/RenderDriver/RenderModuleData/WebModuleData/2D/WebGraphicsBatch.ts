@@ -166,6 +166,8 @@ class BatchContext {
     textureId: number = 0;
     /** 批次的透明度 */
     globalAlpha: number = 1;
+    /**caochangli - 增加渲染标记 */
+    renderFlag:string = null;
     /** 批次的clip信息 */
     clipInfo: any = null;
     /** 批次的shader */
@@ -186,9 +188,11 @@ class BatchContext {
         if (isWebgl) {
             this.setHead = this._setHeadWebgl;
             this.isCompatible = this._isCompatibleWebgl;
+            this.isCompatible2 = this._isCompatibleWebgl2;//caochangli - 处理渲染标记调整顺序
         } else {
             this.setHead = this._setHeadWebgpu;
             this.isCompatible = this._isCompatibleWebgpu;
+            this.isCompatible2 = this._isCompatibleWebgpu2;//caochangli - 处理渲染标记调整顺序
         }
     }
 
@@ -200,6 +204,7 @@ class BatchContext {
 
         this.textureId = element.type & (~63);
         this.globalAlpha = element.owner.globalAlpha;
+        this.renderFlag = element.owner.renderFlag;//caochangli - 增加渲染标记
         this.clipInfo = (element.owner as WebRenderStruct2D).getClipInfo();
         this.type = element.type;
         this.lowType = element.type & 63;
@@ -299,6 +304,76 @@ class BatchContext {
     }
 
     /**
+     * @internal caochangli - WebGL 检查元素是否与批次兼容 - 0不能调换位置 1可调整位置 2可调整位置且合批
+     */
+    _isCompatibleWebgl2(element: IPrimitiveRenderElement2D): number {
+        if (this.type & 32)
+            return 0;
+
+        // 快速检查：最容易变化的属性先检查
+        let elementType = element.type;
+
+        // clip检查：如果元素有clip标记，立即返回false
+        if (elementType & 32) {
+            return 0;
+        }
+
+        let elementLowType = elementType & 63;
+        let elementTexId = elementType & (~63);
+        // 纹理检查放最前，因为这是文字的图片的差别
+        let texSame = elementTexId !== 0 && elementTexId !== this.textureId && this.textureId !== 0 ? false : true;
+        if (!texSame) {
+            let renderFlag = element.owner.renderFlag;
+            if (!renderFlag || !this.renderFlag || renderFlag != this.renderFlag)
+                return 0;
+        }
+
+        // 检查低位类型（最常见的不匹配）
+        if (this.lowType !== elementLowType) {
+            return 0;
+        }
+
+        let elementOwner = element.owner as WebRenderStruct2D;
+
+        // 检查透明度（数值比较，较快）
+        if (this.globalAlpha !== elementOwner.globalAlpha) {
+            return 0;
+        }
+
+        // 检查对象引用（指针比较，较快）
+        if (this.subShader !== element.subShader ||
+            this.bufferState !== element.geometry.bufferState ||
+            this.clipInfo !== elementOwner.getClipInfo() ||
+            elementOwner.globalRenderData !== this.globalRenderData) {
+            return 0;
+        }
+
+        // 检查材质 自定义材质直接比对 shaderdata
+        if ((this.lowType & 16) !== 0 && element.materialShaderData !== this.materialShaderData) {
+            return 0;
+        }
+
+        let fillTexture = element.primitiveShaderData.hasDefine(ShaderDefines2D.FILLTEXTURE);
+        if (fillTexture) {
+            if (!this.fillTexture)
+                return 0;
+
+            // 如果元素存在texRange，则不能批次化
+            if (!element.primitiveShaderData.getVector(ShaderDefines2D.UNIFORM_TEXRANGE).equal(this.texRange))
+                return 0;
+        }
+        else if (this.fillTexture)
+            return 0;
+
+        if (this.textureId === 0 && elementTexId !== 0) {
+            this.textureId = elementTexId;
+            this.primitiveShaderData = element.primitiveShaderData;
+        }
+
+        return texSame ? 2 : 1;
+    }
+
+    /**
      * @internal WebGPU 检查元素是否与批次兼容
      */
     _isCompatibleWebgpu(element: IPrimitiveRenderElement2D): boolean {
@@ -366,11 +441,87 @@ class BatchContext {
     }
 
     /**
+     * @internal caochangli - WebGPU 检查元素是否与批次兼容 - 0不能调换位置 1可调整位置 2可调整位置且合批
+     */
+    _isCompatibleWebgpu2(element: IPrimitiveRenderElement2D): number {
+        if (this.type & 32)
+            return 0;
+
+        // 快速检查：最容易变化的属性先检查
+        let elementType = element.type;
+
+        // clip检查：如果元素有clip标记，立即返回false
+        if (elementType & 32) {
+            return 0;
+        }
+
+        let elementLowType = elementType & 63;
+        let elementTexId = elementType & (~63);
+        // 纹理检查放最前，因为这是文字的图片的差别
+        let texSame = elementTexId !== 0 && elementTexId !== this.textureId && this.textureId !== 0 ? false : true;
+        if (!texSame)
+            return 0;
+
+        // 检查低位类型（最常见的不匹配）
+        if (this.lowType !== elementLowType) {
+            return 0;
+        }
+
+        let elementOwner = element.owner as WebRenderStruct2D;
+
+        // 检查透明度（数值比较，较快）
+        if (this.globalAlpha !== elementOwner.globalAlpha) {
+            return 0;
+        }
+
+        // 检查对象引用（指针比较，较快）
+        if (this.subShader !== element.subShader ||
+            this.bufferState !== element.geometry.bufferState ||
+            this.clipInfo !== elementOwner.getClipInfo() ||
+            elementOwner.globalRenderData !== this.globalRenderData) {
+            return 0;
+        }
+
+        // 检查材质 自定义材质直接比对 shaderdata
+        if (this.lowType & 16 && (element as any)._materialShaderData !== this.materialShaderData) {
+            return 0;
+        }
+
+        let primitiveShaderData = (element as any)._primitiveShaderData;
+        let fillTexture = primitiveShaderData.hasDefine(ShaderDefines2D.FILLTEXTURE);
+        if (fillTexture) {
+            if (!this.fillTexture)
+                return 0;
+
+            // 如果元素存在texRange，则不能批次化
+            if (!primitiveShaderData.getVector(ShaderDefines2D.UNIFORM_TEXRANGE).equal(this.texRange))
+                return 0;
+        }
+        else if (this.fillTexture)
+            return 0;
+
+        if (this.textureId === 0 && elementTexId !== 0) {
+            this.textureId = elementTexId;
+            this.primitiveShaderData = primitiveShaderData;
+        }
+
+        return texSame ? 2 : 1;
+    }
+
+    /**
      * 检查元素是否与批次兼容
      */
     isCompatible(element: IPrimitiveRenderElement2D): boolean {
         // 批次已有确定的贴图ID，检查是否匹配
         return true
+    }
+
+    /**
+     * caochangli - 检查元素是否与批次兼容 - 0不能调换位置 1可调整位置 2可调整位置且合批
+     */
+    isCompatible2(element: IPrimitiveRenderElement2D): number {
+        // 批次已有确定的贴图ID，检查是否匹配
+        return 2
     }
 }
 
@@ -429,6 +580,31 @@ export class WebGraphicsBatch implements IBatch2DProvider {
             allowReorder = false;
 
         if (allowReorder) {
+
+            //测试打印
+            // var dcList:Array<any> = [];
+            // list.elements.forEach(element => {
+            //     var elementOwner = element.owner;
+            //     if (elementOwner)
+            //     {
+            //         var elementOwnerOwner = elementOwner.owner;
+            //         if (elementOwnerOwner)
+            //         {
+            //             var renderer = (elementOwnerOwner as any)._renderer;
+            //             if (renderer && renderer._tex)
+            //                 dcList.push(renderer._tex.url);
+            //             else
+            //             {
+            //                 var text = (elementOwnerOwner as any)._text;
+            //                 if (text !== null && text !== undefined)
+            //                     dcList.push(text);
+            //             }
+            //         }
+            //     }
+            // });
+            // console.log("调整渲染顺序开始：",dcList);
+            //测试打印
+
             if (elementFlags == null)
                 initCache(1000);
 
@@ -437,6 +613,7 @@ export class WebGraphicsBatch implements IBatch2DProvider {
             let indiceLen = 1;
             elementIndice[0] = start;
             elementFlags[0] = 0;
+            orderElements.length = 0;//caochangli - 清理排序后的渲染列表
 
             for (let i = 1; i < cnt; i++) {
                 let element = elementArray[start + i];
@@ -447,7 +624,7 @@ export class WebGraphicsBatch implements IBatch2DProvider {
                 rectRightCache[i] = rect.x + rect.width;
                 rectBottomCache[i] = rect.y + rect.height;
             }
-
+            var onlyChangePos = false;//是否仅调整位置不合批
             for (let i = 1; i < cnt; i++) {
                 let element = elementArray[start + i];
                 let group = elementFlags[i];
@@ -477,8 +654,14 @@ export class WebGraphicsBatch implements IBatch2DProvider {
                             continue;
                     }
                     else {
-                        if (!ctx.isCompatible(element2))
+                        // if (!ctx.isCompatible(element2)) 
+                        //     continue;
+                        // caochangli - 使用考虑renderFlag的方法
+                        let compatible = ctx.isCompatible2(element2);
+                        if (compatible == 0)//不能调换位置
                             continue;
+                        else if (compatible == 1)//可调整位置
+                            onlyChangePos = true;
                     }
 
                     //尝试向前移动
@@ -498,14 +681,66 @@ export class WebGraphicsBatch implements IBatch2DProvider {
                     else if (ctx.textureId !== 0)
                         elementFlags[j] = headGroup;
                 }
-
-                list.add(this.merge(elementArray, 0, indiceLen - 1, ctx, elementIndice));
+                //caochangli - 先保存到排序后的渲染数组中，避免中途修改原数组，后续又用到原数组数据
+                var indiceEnd = indiceLen - 1;
+                if (!onlyChangePos) {//原合并dc
+                    //原03给0
+                    // list.add(this.merge(elementArray, 0, indiceEnd, ctx, elementIndice));
+                    orderElements.push(this.merge(elementArray, 0, indiceEnd, ctx, elementIndice));
+                }
+                else {//仅调整位置
+                    for (var m = 0; m <= indiceEnd; m++) {
+                        // 原1给1 4给2 - 但是后面用到了2已被替换
+                        // list.add(this.merge(elementArray, m, m, ctx, elementIndice));
+                        orderElements.push(this.merge(elementArray, m, m, ctx, elementIndice));
+                    }
+                }
+                onlyChangePos = false;
                 indiceLen = 1;
                 elementIndice[0] = start + i;
                 headGroup = group;
                 ctx.setHead(element);
             }
-            list.add(this.merge(elementArray, 0, indiceLen - 1, ctx, elementIndice));
+            // list.add(this.merge(elementArray, 0, indiceLen - 1, ctx, elementIndice));
+            orderElements.push(this.merge(elementArray, 0, indiceLen - 1, ctx, elementIndice));
+            //caochangli - 将排序后的渲染数据赋值给原数组
+            var orderLen = orderElements.length;
+            if (orderLen > 0)
+            {
+                for (var n = 0; n < orderLen; n++) {
+                    list.add(orderElements[n]);
+                }
+                orderElements.length = 0;
+            }
+
+            //测试打印
+            // var dcList:Array<any> = [];
+            // var index:number = 0;
+            // list.elements.forEach(element => {
+            //     if (index < list.length)
+            //     {
+            //         var elementOwner = element.owner;
+            //         if (elementOwner)
+            //         {
+            //             var elementOwnerOwner = elementOwner.owner;
+            //             if (elementOwnerOwner)
+            //             {
+            //                 var renderer = (elementOwnerOwner as any)._renderer;
+            //                 if (renderer && renderer._tex)
+            //                     dcList.push(renderer._tex.url);
+            //                 else
+            //                 {
+            //                     var text = (elementOwnerOwner as any)._text;
+            //                     if (text !== null && text !== undefined)
+            //                         dcList.push(text);
+            //                 }
+            //             }
+            //         }
+            //     }
+            //     index ++;
+            // });
+            // console.log("调整渲染顺序结束：",dcList);
+            //测试打印
         }
         else {
             let batchStart = start;
@@ -588,6 +823,8 @@ var rectLeftCache: Float32Array;
 var rectTopCache: Float32Array;
 var rectRightCache: Float32Array;
 var rectBottomCache: Float32Array;
+/**caochangli - 排序后的渲染列表 */
+var orderElements: Array<IPrimitiveRenderElement2D>;
 function initCache(maxElements: number) {
     elementFlags = new Int16Array(maxElements);
     elementIndice = new Int16Array(maxElements);
@@ -595,4 +832,5 @@ function initCache(maxElements: number) {
     rectTopCache = new Float32Array(maxElements);
     rectRightCache = new Float32Array(maxElements);
     rectBottomCache = new Float32Array(maxElements);
+    orderElements = [];
 }

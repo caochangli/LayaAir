@@ -1037,6 +1037,21 @@ export class Sprite extends Node {
         return this._struct.dcOptimize;
     }
 
+    /**caochangli - 增加渲染标记(用于列表中且drawCallOptimize=true是远程资源打断后续元素合批问题) */
+    public set renderFlag(value:string)
+    {
+        if (value == null) value = "";
+        if (this._struct.renderFlag === value)
+            return;
+        this._struct.renderFlag = value;
+        this._struct.setRepaint();
+        this.parentRepaint();
+    }
+    public get renderFlag():string
+    {
+        return this._struct.renderFlag;
+    }
+
     /**
      * @en Whether to enable culling.
      * @zh 是否启用裁剪。
