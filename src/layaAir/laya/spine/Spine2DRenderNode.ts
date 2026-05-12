@@ -464,7 +464,7 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
     protected init(templet: SpineTemplet): void {
         if (this.destroyed) return;
         if (this._templet) {
-            this.clear();
+            this.clear(true);
         }
 
         this._templet = templet;
@@ -826,7 +826,10 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
     }
 
     /** @internal */
-    reset() {
+    reset(isInitTemplet:boolean = false) {
+        //caochangli - 初始化动画模块时不能清理_source，此时的_source是本次init的Templet.url
+        if (!isInitTemplet)
+            this._source = null;
         //caochangli - 容错
         if (this._templet)
         {
@@ -992,9 +995,9 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
      * @zh 清除方法，用于释放和重置相关资源。
      * @en Clear method, used to release and reset related resources.
      */
-    clear(): void {
+    clear(isInitTemplet:boolean = false): void {
         this.clearRenderElement();
-        this.reset();
+        this.reset(isInitTemplet);
         this.owner?.repaint();
         //native 同步数据
         this._struct.renderElements = this._renderElements;
