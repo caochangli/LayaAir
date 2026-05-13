@@ -23,6 +23,7 @@ import { NodeFlags } from "../../../../Const";
 import { WebGraphicsBatch } from "./WebGraphicsBatch";
 import { Vector4 } from "../../../../maths/Vector4";
 import { Rectangle } from "../../../../maths/Rectangle";
+import { Spine2DRenderNode } from "../../../../spine/Spine2DRenderNode";
 
 BatchManager.registerProvider(BaseRender2DType.graphics, WebGraphicsBatch);
 
@@ -347,15 +348,67 @@ export class WebRender2DPass implements IRender2DPass {
          let allowReorder = groupsArray[gi + 2];
          let lastRenderType = elementArray[groupStart].owner.renderType;
          let batchStart = groupStart;
+         /**caochangli - 本组是否有graphics渲染方式(图文) */
+         let hasGraphics = lastRenderType == BaseRender2DType.graphics;
 
          for (let i = groupStart + 1; i <= groupEnd; i++) {
             let element = elementArray[i];
             let struct = element.owner as WebRenderStruct2D;
-            if (lastRenderType === struct.renderType)
+            let renderType = struct.renderType;
+            if (lastRenderType === renderType)
                continue;
 
-            if (i - batchStart > 1)
-               this.getBatchProvider(lastRenderType).batch(list, batchStart, i - 1, allowReorder);
+            //caochangli - 渲染方式不一样，且开启智能合批
+            else if (allowReorder) {
+               /**
+                * caochangli - 说明：原逻辑只要渲染类型不一致就分开batch(图片&文字的renderType=4，spine的renderType=0或1)
+                * 图片&文字的renderType：BaseRender2DType.graphics=4 - 进入WebGraphicsBatch.batch智能调整位置合批
+                * spine的renderType：BaseRender2DType.baseRenderNode=0(高性能渲染)、BaseRender2DType.spine=1(单独渲染) - 进入NullBatchProvider.batch(list.add)
+                * 解决：列表开启drawCallOptimize时，列表中item节点下的子节点因图片&文字、spine穿插导致被spine截断后续图片&文字节点无法合批
+                * 如，第一个item：spine、bg、hasFlag、spine、text、spine；第二个item：spine、bg、hasFlag、spine、text、spine
+                * 原逻辑batch执行情况如下：
+                     * 1. spine(list.add)
+                     * 2. bg、hasFlag(WebGraphicsBatch.batch)
+                     * 3. spine(list.add)
+                     * 4. text(list.add)
+                     * 5. spine(list.add)
+                     * 6. spine(list.add)
+                     * 7. bg、hasFlag(WebGraphicsBatch.batch)
+                     * 8. spine(list.add)
+                     * 9. text(list.add)
+                     * 10. spine(list.add)
+                     * 结论：两个bg没有合批、两个hasFlag没有合批、两个text没有合批
+               * 所以，需要在遇到spine(渲染方式：0或1)时不拆分batch，
+               * 让其“spine、bg、hasFlag、spine、text、spine；spine、bg、hasFlag、spine、text、spine”整体进入WebGraphicsBatch.batch，
+               * 在WebGraphicsBatch.batch中进行智能调整顺序达到合批最优解：“spine、spine、bg、bg、hasFlag、hasFlag、spine、spine、text、text、spine、spine”
+               */
+
+               let onwerSprite = struct.owner;//所属节点
+               if (!hasGraphics)
+                  hasGraphics = renderType == BaseRender2DType.graphics;
+
+               // 当前节点设置了renderFlag标记
+               if (onwerSprite.renderFlag) {
+                  //  暂时只处理图文被spine打断情况(对于图文被粒子等其他元素打断的情况暂不处理)
+                  if (renderType == BaseRender2DType.graphics || onwerSprite.renderNode2D instanceof Spine2DRenderNode) {
+                     lastRenderType = renderType;
+                     continue;//不打断 - 一并进入WebGraphicsBatch.batch进行智能合批
+                  }
+               }
+               // 当前节点没有renderFlag标记且当前节点是图文
+               else if (renderType == BaseRender2DType.graphics) {
+                  lastRenderType = renderType;
+                  continue;//不打断 - 一并进入WebGraphicsBatch.batch进行智能合批
+               }
+            }
+            //caochangli - 渲染方式不一样，且开启智能合批
+
+            if (i - batchStart > 1) {
+               if (allowReorder && hasGraphics)//开启智能合批且本组存在graphics渲染方式：可能lastRenderType=BaseRender2DType.baseRenderNode
+                  this.getBatchProvider(BaseRender2DType.graphics).batch(list, batchStart, i - 1, allowReorder);
+               else
+                  this.getBatchProvider(lastRenderType).batch(list, batchStart, i - 1, allowReorder);
+            }
             else
                list.add(elementArray[batchStart]);
 
@@ -363,8 +416,12 @@ export class WebRender2DPass implements IRender2DPass {
             lastRenderType = struct.renderType;
          }
 
-         if (groupEnd - batchStart > 0)
-            this.getBatchProvider(lastRenderType).batch(list, batchStart, groupEnd, allowReorder);
+         if (groupEnd - batchStart > 0) {
+            if (allowReorder && hasGraphics)//开启智能合批且本组存在graphics渲染方式：可能lastRenderType=BaseRender2DType.baseRenderNode
+               this.getBatchProvider(BaseRender2DType.graphics).batch(list, batchStart, groupEnd, allowReorder);
+            else
+               this.getBatchProvider(lastRenderType).batch(list, batchStart, groupEnd, allowReorder);
+         }
          else
             list.add(elementArray[batchStart]);
       }

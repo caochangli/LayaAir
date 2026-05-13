@@ -163,12 +163,14 @@ class BatchBuffer {
  * 批次上下文，用于跟踪批次的状态信息
  */
 class BatchContext {
+    /**caochangli - 增加渲染类型(将spine等非graphics节点放进WebRender2DPass后需要区别处理) */
+    renderType:number = 0;
+    /**caochangli - 增加渲染标记 */
+    renderFlag:string = null;
     /** 批次使用的贴图ID */
     textureId: number = 0;
     /** 批次的透明度 */
     globalAlpha: number = 1;
-    /**caochangli - 增加渲染标记 */
-    renderFlag:string = null;
     /** 批次的clip信息 */
     clipInfo: any = null;
     /** 批次的shader */
@@ -198,6 +200,15 @@ class BatchContext {
     }
 
     _setHeadWebgl(element: IPrimitiveRenderElement2D): void {
+        // caochangli
+        this.renderType = element.owner.renderType;//渲染类型
+        this.renderFlag = element.owner.renderFlag;//渲染标记
+        // 引擎原逻辑只有(图片、文字)renderType=BaseRender2DType.graphics才会进入WebGraphicsBatch类，进行智能调整渲染顺序合并dc。
+        // 为了解决spine打断后续节点合批问题，把spine渲染节点(renderType=BaseRender2DType.baseRenderNode)也放进此类，用于一并调整位置。
+        if (this.renderType != BaseRender2DType.graphics)
+            return;
+        // caochangli
+
         this.primitiveShaderData = element.primitiveShaderData;
         this.materialShaderData = element.materialShaderData;
         this.subShader = element.subShader;
@@ -205,7 +216,6 @@ class BatchContext {
 
         this.textureId = element.type & (~63);
         this.globalAlpha = element.owner.globalAlpha;
-        this.renderFlag = element.owner.renderFlag;//caochangli - 增加渲染标记
         this.clipInfo = (element.owner as WebRenderStruct2D).getClipInfo();
         this.type = element.type;
         this.lowType = element.type & 63;
@@ -215,6 +225,15 @@ class BatchContext {
     }
 
     _setHeadWebgpu(element: IPrimitiveRenderElement2D): void {
+        // caochangli
+        this.renderType = element.owner.renderType;//渲染类型
+        this.renderFlag = element.owner.renderFlag;//渲染标记
+        // 引擎原逻辑只有(图片、文字)renderType=BaseRender2DType.graphics才会进入WebGraphicsBatch类，进行智能调整渲染顺序合并dc。
+        // 为了解决spine打断后续节点合批问题，把spine渲染节点(renderType=BaseRender2DType.baseRenderNode)也放进此类，用于一并调整位置。
+        if (this.renderType != BaseRender2DType.graphics)
+            return;
+        // caochangli
+
         //@ts-ignore
         this.primitiveShaderData = element._primitiveShaderData;
         //@ts-ignore
@@ -242,6 +261,11 @@ class BatchContext {
      * @internal WebGL 检查元素是否与批次兼容
      */
     _isCompatibleWebgl(element: IPrimitiveRenderElement2D): boolean {
+        // caochangli - 将非graphics渲染节点(如：spine)放进WebGraphicsBatch类：非graphics渲染节点原逻辑就不能合并
+        if (this.renderType != BaseRender2DType.graphics || element.owner.renderType != BaseRender2DType.graphics)
+            return false;
+        // caochangli - 将非graphics渲染节点(如：spine)放进WebGraphicsBatch类：非graphics渲染节点原逻辑就不能合并
+
         if (this.type & 32)
             return false;
 
@@ -400,6 +424,11 @@ class BatchContext {
      * @internal WebGPU 检查元素是否与批次兼容
      */
     _isCompatibleWebgpu(element: IPrimitiveRenderElement2D): boolean {
+        // caochangli - 将非graphics渲染节点(如：spine)放进WebGraphicsBatch类：非graphics渲染节点原逻辑就不能合并
+        if (this.renderType != BaseRender2DType.graphics || element.owner.renderType != BaseRender2DType.graphics)
+            return false;
+        // caochangli - 将非graphics渲染节点(如：spine)放进WebGraphicsBatch类：非graphics渲染节点原逻辑就不能合并
+
         if (this.type & 32)
             return false;
 
@@ -631,7 +660,9 @@ export class WebGraphicsBatch implements IBatch2DProvider {
 
             //测试打印
             // var dcList:Array<any> = [];
-            // list.elements.forEach(element => {
+            // for (var i = start; i <= end; i++)
+            // {
+            //     var element = list.elements[i];
             //     var elementOwner = element.owner;
             //     if (elementOwner)
             //     {
@@ -655,7 +686,7 @@ export class WebGraphicsBatch implements IBatch2DProvider {
             //             }
             //         }
             //     }
-            // });
+            // }
             // console.log("调整渲染顺序开始：",dcList);
             //测试打印
 
@@ -673,10 +704,18 @@ export class WebGraphicsBatch implements IBatch2DProvider {
                 let element = elementArray[start + i];
                 elementFlags[i] = -1; //undetermined
                 let rect = element.owner.rect;
-                rectLeftCache[i] = rect.x;
-                rectTopCache[i] = rect.y;
-                rectRightCache[i] = rect.x + rect.width;
-                rectBottomCache[i] = rect.y + rect.height;
+                // caochanlgi - spine节点? 风险点：可能不是spine；即便是spine，那spine的区域真的可以这么计算吗
+                if (element.owner.renderType != BaseRender2DType.graphics) {
+                    rectLeftCache[i] = rect.x - rect.width/2;
+                    rectTopCache[i] = rect.y - rect.height/2;
+                    rectRightCache[i] = rect.x + rect.width/2;
+                    rectBottomCache[i] = rect.y + rect.height/2;
+                } else {
+                    rectLeftCache[i] = rect.x;
+                    rectTopCache[i] = rect.y;
+                    rectRightCache[i] = rect.x + rect.width;
+                    rectBottomCache[i] = rect.y + rect.height;
+                }
             }
             var onlyChangePos = false;//是否仅调整位置不合批
             for (let i = 1; i < cnt; i++) {
@@ -738,13 +777,11 @@ export class WebGraphicsBatch implements IBatch2DProvider {
                 //caochangli - 先保存到排序后的渲染数组中，避免中途修改原数组，后续又用到原数组数据
                 var indiceEnd = indiceLen - 1;
                 if (!onlyChangePos) {//原合并dc
-                    //原03给0
                     // list.add(this.merge(elementArray, 0, indiceEnd, ctx, elementIndice));
                     orderElements.push(this.merge(elementArray, 0, indiceEnd, ctx, elementIndice));
                 }
                 else {//仅调整位置
                     for (var m = 0; m <= indiceEnd; m++) {
-                        // 原1给1 4给2 - 但是后面用到了2已被替换
                         // list.add(this.merge(elementArray, m, m, ctx, elementIndice));
                         orderElements.push(this.merge(elementArray, m, m, ctx, elementIndice));
                     }
@@ -769,36 +806,33 @@ export class WebGraphicsBatch implements IBatch2DProvider {
 
             //测试打印
             // var dcList:Array<any> = [];
-            // var index:number = 0;
-            // list.elements.forEach(element => {
-            //     if (index < list.length)
+            // for (var i = 0; i < list.length; i++)
+            // {
+            //     var element = list.elements[i];
+            //     var elementOwner = element.owner;
+            //     if (elementOwner)
             //     {
-            //         var elementOwner = element.owner;
-            //         if (elementOwner)
+            //         var elementOwnerOwner = elementOwner.owner;
+            //         if (elementOwnerOwner)
             //         {
-            //             var elementOwnerOwner = elementOwner.owner;
-            //             if (elementOwnerOwner)
+            //             var renderer = (elementOwnerOwner as any)._renderer;
+            //             if (renderer && renderer._tex)
+            //                 dcList.push(renderer._tex.url);
+            //             else
             //             {
-            //                 var renderer = (elementOwnerOwner as any)._renderer;
-            //                 if (renderer && renderer._tex)
-            //                     dcList.push(renderer._tex.url);
+            //                 var text = (elementOwnerOwner as any)._text;
+            //                 if (text !== null && text !== undefined)
+            //                     dcList.push(text);
             //                 else
             //                 {
-            //                     var text = (elementOwnerOwner as any)._text;
-            //                     if (text !== null && text !== undefined)
-            //                         dcList.push(text);
-            //                     else
-            //                     {
-            //                         var spine = (elementOwnerOwner as any).getComponent(Spine2DRenderNode);
-            //                         if (spine && spine._templet)
-            //                             dcList.push(spine._templet.url);
-            //                     }
+            //                     var spine = (elementOwnerOwner as any).getComponent(Spine2DRenderNode);
+            //                     if (spine && spine._templet)
+            //                         dcList.push(spine._templet.url);
             //                 }
             //             }
             //         }
             //     }
-            //     index ++;
-            // });
+            // }
             // console.log("调整渲染顺序结束：",dcList);
             //测试打印
         }
@@ -819,6 +853,10 @@ export class WebGraphicsBatch implements IBatch2DProvider {
     private merge(elementArray: Array<IPrimitiveRenderElement2D>, start: number, end: number, batchContext: BatchContext, indice?: Int16Array): IPrimitiveRenderElement2D {
         if (start === end) {
             let element = elementArray[indice !== undefined ? indice[start] : start];
+            // caochangli - 将非graphics渲染节点(如：spine)放进WebGraphicsBatch类：不能合并直接返回
+            if (element.owner.renderType != BaseRender2DType.graphics)
+                return element;
+            // caochangli - 将非graphics渲染节点(如：spine)放进WebGraphicsBatch类：不能合并直接返回
             this._buffer.add(element);
             return element;
         }
