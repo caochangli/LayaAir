@@ -332,18 +332,10 @@ class BatchContext {
      * @internal caochangli - WebGL 检查元素是否与批次兼容 - 0不能调换位置 1可调整位置 2可调整位置且合批
      */
     _isCompatibleWebgl2(element: IPrimitiveRenderElement2D): number {
-        let isCompatible = this._isCompatibleWebgl(element);
-        // 可以合批直接返回 2
-        if (isCompatible)
-            return 2;
-        let ownerRenderFlag = element.owner.renderFlag;
-        //renderFlag相同 - 后续如果有问题，可使用下面的方案
-        if (ownerRenderFlag && this.renderFlag && ownerRenderFlag == this.renderFlag)
-            return 1;
-        return 0;
+        // 未启用renderFlag字段
+        if (!LayaGL.enableGraphicsRenderFlag)
+            return this._isCompatibleWebgl(element) ? 2 : 0;
 
-
-        // ------更精准的根据不同条件判断是否可以调位置
         if (this.type & 32)
             return 0;
 
@@ -496,18 +488,10 @@ class BatchContext {
      * @internal caochangli - WebGPU 检查元素是否与批次兼容 - 0不能调换位置 1可调整位置 2可调整位置且合批
      */
     _isCompatibleWebgpu2(element: IPrimitiveRenderElement2D): number {
-        let isCompatible = this._isCompatibleWebgpu(element);
-        // 可以合批直接返回 2
-        if (isCompatible)
-            return 2;
-        let ownerRenderFlag = element.owner.renderFlag;
-        //renderFlag相同 - 后续如果有问题，可使用下面的方案
-        if (ownerRenderFlag && this.renderFlag && ownerRenderFlag == this.renderFlag)
-            return 1;
-        return 0;
-        
+        // 未启用renderFlag字段
+        if (!LayaGL.enableGraphicsRenderFlag)
+            return this._isCompatibleWebgpu(element) ? 2 : 0;
 
-        // ------更精准的根据不同条件判断是否可以调位置
         if (this.type & 32)
             return 0;
 
@@ -699,23 +683,39 @@ export class WebGraphicsBatch implements IBatch2DProvider {
             elementIndice[0] = start;
             elementFlags[0] = 0;
             orderElements.length = 0;//caochangli - 清理排序后的渲染列表
+            let rectX,rectY,rectWidth,rectHeight;
 
             for (let i = 1; i < cnt; i++) {
                 let element = elementArray[start + i];
                 elementFlags[i] = -1; //undetermined
                 let rect = element.owner.rect;
+
                 // caochanlgi - spine节点? 风险点：可能不是spine；即便是spine，那spine的区域真的可以这么计算吗
+                rectX = rect.x;rectY = rect.y;rectWidth = rect.width;rectHeight = rect.height;
                 if (element.owner.renderType != BaseRender2DType.graphics) {
-                    rectLeftCache[i] = rect.x - rect.width/2;
-                    rectTopCache[i] = rect.y - rect.height/2;
-                    rectRightCache[i] = rect.x + rect.width/2;
-                    rectBottomCache[i] = rect.y + rect.height/2;
-                } else {
-                    rectLeftCache[i] = rect.x;
-                    rectTopCache[i] = rect.y;
-                    rectRightCache[i] = rect.x + rect.width;
-                    rectBottomCache[i] = rect.y + rect.height;
-                }
+                    let ownerSprite = element.owner.owner;
+                    let renderNode2D = ownerSprite.renderNode2D;
+                    // 动画模板中x或y进行了偏移，则认为偏移的一侧原点在左边或上边，比如：x、y都偏移了，则认为此spine原点在左上角
+                    // - 如果动画模板中偏移后原点不是左边或上边请特效人员修改动画
+                    if (renderNode2D && renderNode2D instanceof Spine2DRenderNode) {
+                        let templet = renderNode2D.templet;
+                        if (templet) {
+                            // x方向没有偏移 - x方向原点在中心
+                            if (templet.offsetX == 0)
+                                rectX -= rect.width/2;
+                            // y方向没有偏移 - y方向原点在中心
+                            if (templet.offsetY == 0)
+                                rectY -= rect.height/2;
+                            // 用业务设置的宽高计算位置重叠(如果不对，请业务调整宽高) - spine.rect的宽高会加上templet.offset，参考：Spine2DRenderNode.rect
+                            rectWidth = ownerSprite.width;
+                            rectHeight = ownerSprite.height;
+                        }
+                    }
+                } 
+                rectLeftCache[i] = rectX;
+                rectTopCache[i] = rectY;
+                rectRightCache[i] = rectX + rectWidth;
+                rectBottomCache[i] = rectY + rectHeight;
             }
             var onlyChangePos = false;//是否仅调整位置不合批
             for (let i = 1; i < cnt; i++) {
@@ -736,7 +736,7 @@ export class WebGraphicsBatch implements IBatch2DProvider {
                         elementIndice[indiceLen++] = start + i;
                         continue;
                     }
-
+                    
                     elementFlags[i] = group = maxGroup++;
                 }
 

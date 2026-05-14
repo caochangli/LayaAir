@@ -341,6 +341,8 @@ export class WebRender2DPass implements IRender2DPass {
       let groups = this._elementGroups;
       let groupsArray = groups.elements;
       list.length = 0;
+      /**caochangli - 是否启用spine元素renderFlag字段 */
+      let enableRenderFlag = LayaGL.enableGraphicsRenderFlag && LayaGL.enableSpineRenderFlag;
 
       for (let gi = 0, gl = groups.length; gi < gl; gi += 3) {
          let groupStart = groupsArray[gi];
@@ -359,7 +361,7 @@ export class WebRender2DPass implements IRender2DPass {
                continue;
 
             //caochangli - 渲染方式不一样，且开启智能合批
-            else if (allowReorder) {
+            else if (enableRenderFlag && allowReorder) {
                /**
                 * caochangli - 说明：原逻辑只要渲染类型不一致就分开batch(图片&文字的renderType=4，spine的renderType=0或1)
                 * 图片&文字的renderType：BaseRender2DType.graphics=4 - 进入WebGraphicsBatch.batch智能调整位置合批
