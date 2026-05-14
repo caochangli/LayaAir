@@ -28,6 +28,25 @@
  *****************************************************************************/
 var spine;
 (function (spine) {
+//#region caochangli - Map对象池
+    class MapPool {
+        constructor() {
+            this.mapPools = [];
+        }
+        get() {
+            if (this.mapPools.length > 0)
+                return this.mapPools.pop();
+            return new Map();
+        }
+        recover(map) {
+            if (map) {
+                map.clear();
+                this.mapPools.push(map);
+            }
+        }
+    }
+    spine.MapPool = new MapPool();
+//#endregion caochangli - Map对象池
     class Animation {
         constructor(name, timelines, duration) {
             this.timelines = null;
@@ -4737,6 +4756,7 @@ var spine;
                 for (; i < n; i++)
                     skeletonData.skins[i] = this.readSkin(input, skeletonData, false, nonessential);
             }
+            this.attachmentLoader.atlas.clearRegionMap();//caochangli - 初始化完成回到对象池
             n = this.linkedMeshes.length;
             for (let i = 0; i < n; i++) {
                 let linkedMesh = this.linkedMeshes[i];
@@ -7498,13 +7518,32 @@ var spine;
             }
         }
         findRegion(name) {
-            for (let i = 0; i < this.regions.length; i++) {
-                if (this.regions[i].name == name) {
-                    return this.regions[i];
+            // caochangli - 先存到字典中，缓解初始化时每个Region查找都遍历的耗时
+            if (!this.regionMap)
+            {
+                this.regionMap = spine.MapPool.get();
+                for (let i = 0; i < this.regions.length; i++) {
+                    let region = this.regions[i];
+                    this.regionMap.set(region.name,region);
                 }
             }
+            return this.regionMap.get(name);
+            // caochangli - 先存到字典中，缓解初始化时每个Region找到都遍历的耗时
+            // for (let i = 0; i < this.regions.length; i++) {
+            //     if (this.regions[i].name == name) {
+            //         return this.regions[i];
+            //     }
+            // }
             return null;
         }
+//#region caochangli - 初始化完成回到对象池
+        clearRegionMap() {
+            if (this.regionMap) {
+                spine.MapPool.recover(this.regionMap);
+                this.regionMap = null;
+            }
+        }
+//#endregion caochangli - 初始化完成回到对象池
         setTextures(assetManager, pathPrefix = "") {
             for (let page of this.pages)
                 page.setTexture(assetManager.get(pathPrefix + page.name));
