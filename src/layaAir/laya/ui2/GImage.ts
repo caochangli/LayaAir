@@ -166,18 +166,26 @@ export class GImage extends GWidget {
             if (LayaEnv.isPreview)
             {
                 AssetDb.inst.uuidToUrl(this._src,(uuid:string,url:string)=>{
-                    if (!this.destroyed && this._src && this._src == uuid)
+                    if (!this.destroyed && this._src && uuid == this._src)
                     {
                         if (!url)
                             this.onLoaded(null, loadID);
                         else
-                            this._srcAssetGroup.Load(url,Loader.IMAGE,this,(url:string,res:Texture)=>{this.onLoaded(res, loadID)});
+                            this._srcAssetGroup.Load(url,Loader.IMAGE,this,(url:string,res:Texture)=>{
+                                if (url == this._src || uuid == this._src)//需要的资源正在加载中时会被挡掉，但当加载完时loadID又没对上
+                                    loadID = this._loadId;
+                                this.onLoaded(res, loadID);
+                            });
                     }
                 });
             }
             //生产模式 - 没有uuid，都是用路径加载的
             else
-                this._srcAssetGroup.Load(this._src,Loader.IMAGE,this,(url:string,res:Texture)=>{this.onLoaded(res, loadID)});
+                this._srcAssetGroup.Load(this._src,Loader.IMAGE,this,(url:string,res:Texture)=>{
+                    if (url == this._src)//需要的资源正在加载中时会被挡掉，但当加载完时loadID又没对上
+                        loadID = this._loadId;
+                    this.onLoaded(res, loadID);
+                });
         }
     }
     private _cancelSrcLoad() {
