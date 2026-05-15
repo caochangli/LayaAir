@@ -2919,8 +2919,8 @@ export class Sprite extends Node {
             let ele:Sprite = this.parent;
             while (ele && !ele._destroyed)
             {
-                width = width * ele._scaleX;
                 if (ele == globalNode) break;
+                width = width * ele._scaleX;
                 ele = ele.parent;
             }
             return width;
@@ -2933,8 +2933,8 @@ export class Sprite extends Node {
             let ele:Sprite = this.parent;
             while (ele && !ele._destroyed)
             {
-                height = height * ele._scaleY;
                 if (ele == globalNode) break;
+                height = height * ele._scaleY;
                 ele = ele.parent;
             }
             return height;
