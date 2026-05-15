@@ -409,6 +409,10 @@ class BatchContext {
             this.primitiveShaderData = element.primitiveShaderData;
         }
 
+        // 不是图文 - spine和spine对比
+        if (this.renderType != BaseRender2DType.graphics || elementOwner.renderType != BaseRender2DType.graphics)
+            isDcMerg = false;
+
         return isDcMerg ? 2 : 1;
     }
 
@@ -565,6 +569,10 @@ class BatchContext {
             this.textureId = elementTexId;
             this.primitiveShaderData = primitiveShaderData;
         }
+
+        // 不是图文 - spine和spine对比
+        if (this.renderType != BaseRender2DType.graphics || elementOwner.renderType != BaseRender2DType.graphics)
+            isDcMerg = false;
 
         return isDcMerg ? 2 : 1;
     }
