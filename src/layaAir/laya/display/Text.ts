@@ -14,6 +14,7 @@ import { Rectangle } from "../maths/Rectangle";
 import { AssetDb } from "../resource/AssetDb";
 import { AssetGroup, IAssetGroup } from "../sgsExpand/loader/AssetGroup";
 import { Browser } from "../utils/Browser";
+import { ColorUtils } from "../utils/ColorUtils";
 import { Pool } from "../utils/Pool";
 import { Utils } from "../utils/Utils";
 import { TextRenderConfig } from "../webgl/text/TextRenderConfig";
@@ -1814,12 +1815,17 @@ export class Text extends Sprite {
 
             let cmd = line.cmd;
             while (cmd) {
+                //#region liurui link类型的富文本点击区域添加下划线和间隔高度
+                const underlineGap = 1; // 下划线间距，之前是0，贴的太近了
+                const underlineRate = 1 / 12; // 下划线宽度占比，之前是1/16
                 if (cmd.linkEnd) {
                     if (curLink) {
-                        curLink.addRect(linkStartX, y, x + cmd.x + cmd.width - linkStartX, line.height);
+                        const thickness = Math.max(1, cmd.fontSize * underlineRate);
+                        curLink.addRect(linkStartX, y, x + cmd.x + cmd.width - linkStartX, line.height + thickness + underlineGap);
                         curLink = null;
                     }
                 }
+                //#endregion liurui link类型的富文本点击区域添加下划线和间隔高度
 
                 if (cmd.obj) {
                     cmd.obj.pos(x + cmd.x, y + cmd.y);
@@ -1859,8 +1865,13 @@ export class Text extends Sprite {
 
                 if (!lineClipped && cmd.width > 0) {
                     if (cmd.style.underline) {
-                        let thickness = Math.max(1, cmd.fontSize / 16);
-                        graphics.drawLine(x + cmd.x, y + line.height - thickness, x + cmd.x + cmd.width, y + line.height - thickness, cmd.style.underlineColor || cmd.style.color, thickness);
+                        //#region liurui link类型的富文本下划线位置+调整
+                        let thickness = Math.max(1, cmd.fontSize * underlineRate);
+                        let fromY = y + line.height + underlineGap;
+                        let toY = fromY;
+                        let underlineColor = ColorUtils.create(cmd.style.underlineColor || cmd.style.color).strColor;
+                        graphics.drawLine(x + cmd.x, fromY, x + cmd.x + cmd.width, toY, underlineColor, thickness);
+                        //#endregion liurui link类型的富文本下划线位置+调整
                     }
                     if (cmd.style.strikethrough) {
                         //画删除线
