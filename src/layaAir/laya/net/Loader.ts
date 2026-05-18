@@ -1435,7 +1435,7 @@ export class Loader extends EventDispatcher {
         }
 
         let configs: Array<any> = fileConfig.config;
-        let len = configs.length;
+        let len = configs ? configs.length : 0;
         let i = 0, j = 0, m = 0, k = 0, n = 0;
         let indice: Array<number>;
         let c: any;
