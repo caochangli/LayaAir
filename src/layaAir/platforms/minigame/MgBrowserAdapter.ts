@@ -98,6 +98,13 @@ export class MgBrowserAdapter extends BrowserAdapter {
                 this.event(Event.RESIZE);
             });
         }
+        // caochangli - 微信小游戏，部分ipad横竖屏切换时不触发onWindowResize，而触发onDeviceOrientationChange
+        if (Browser.onWXMiniGame && platform == "ios" && PAL.hasAPI("onDeviceOrientationChange")) {
+            PAL.g.onDeviceOrientationChange(result => {
+                this.event(Event.ORIENTATION_CHANGE);
+            });
+        }
+        // caochangli - 微信小游戏，部分ipad横竖屏切换时不触发onWindowResize，而触发onDeviceOrientationChange
     }
 
     start(): Promise<void> {
