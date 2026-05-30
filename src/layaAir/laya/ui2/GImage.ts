@@ -165,13 +165,13 @@ export class GImage extends GWidget {
             //预览模式 - 将uuid转成url
             if (LayaEnv.isPreview)
             {
-                AssetDb.inst.uuidToUrl(this._src,(uuid:string,url:string)=>{
+                AssetDb.inst.uuidToUrl(this._src,(uuid:string,uuidUrl:string)=>{
                     if (!this.destroyed && this._src && uuid == this._src)
                     {
-                        if (!url)
+                        if (!uuidUrl)
                             this.onLoaded(null, loadID);
                         else
-                            this._srcAssetGroup.Load(url,Loader.IMAGE,this,(url:string,res:Texture)=>{
+                            this._srcAssetGroup.Load(uuidUrl,Loader.IMAGE,this,(url:string,res:Texture)=>{
                                 if (url == this._src || uuid == this._src)//需要的资源正在加载中时会被挡掉，但当加载完时loadID又没对上
                                     loadID = this._loadId;
                                 this.onLoaded(res, loadID);

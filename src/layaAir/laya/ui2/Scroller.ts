@@ -190,7 +190,14 @@ export class Scroller implements IScroller {
     }
 
     destroy() {
+        // caochangli - 报错处理
+        ILaya.stage.off(Event.MOUSE_MOVE, this, this._touchMove);
+        ILaya.stage.off(Event.MOUSE_UP, this, this._touchEnd);
+
         this.owner = null;
+
+        if (draggingInst == this)
+            draggingInst = null;
     }
 
     get hScrollBar(): GScrollBar {
@@ -1235,7 +1242,7 @@ export class Scroller implements IScroller {
     }
 
     private _touchMove(evt: Event): void {
-        if (!this._touchEffect || this.owner.destroyed)
+        if (!this._touchEffect || !this.owner || this.owner.destroyed)
             return;
 
         if (draggingInst?.owner?.displayedInStage && draggingInst != this) //已经有其他拖动
