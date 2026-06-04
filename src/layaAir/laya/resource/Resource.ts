@@ -68,6 +68,8 @@ export class Resource extends EventDispatcher {
      * @zh 销毁当前没有被使用的资源,该函数会忽略lock=true的资源。
      */
     static destroyUnusedResources(): void {
+        return;// caochangli - 废除此方法，这里没有使用框架自建的引用计数
+        
         _disposingCounter = 0; //复位一下，避免异常造成的标志错误
         _clearRetry = 0;
 
