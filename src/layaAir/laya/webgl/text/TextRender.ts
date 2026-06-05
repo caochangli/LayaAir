@@ -99,7 +99,7 @@ export class TextRender {
                 let key = cacheKey + cc;
                 let ri = this.charMap.get(key);
                 if (!ri) {
-                    let width = ctx.measureText(cc).width;
+                    let width = TextRender.measureText(cc,ctx).width;//ctx.measureText(cc).width;
                     ri = this.drawOffscreen(ctx, cc, width, fontSize, stroke, true);
                     ri.key = key;
                     ri.isChar = true;
@@ -126,7 +126,7 @@ export class TextRender {
 
             if (!ri) {
                 if (preMeasuredWidth == null)
-                    preMeasuredWidth = ctx.measureText(text).width;
+                    preMeasuredWidth = TextRender.measureText(text,ctx).width;//ctx.measureText(text).width;
                 ri = this.drawOffscreen(ctx, text, preMeasuredWidth, fontSize, stroke, false);
                 ri.key = key;
                 ri.ref = 1;
@@ -395,6 +395,69 @@ export class TextRender {
             this.free(ri);
         }
     }
+
+
+//#region caochangli - 缓存文本宽度
+    
+    private static _enableTextWidthCache:boolean = true;
+    /**文本宽度缓存字典 */
+    private static _textWidthMap:Map<string,TextMetrics> = new Map();
+    /**文本宽度缓存顺序 - 最新使用的在后面 */
+    private static _textWidthOrder: string[] = [];
+    /**是否启动文本宽度缓存 */
+    public static set enableTextWidthCache(value:boolean) {
+        this._enableTextWidthCache = value;
+        if (!this._enableTextWidthCache)// 关闭缓存
+        {
+            this._textWidthMap.clear();
+            this._textWidthOrder.length = 0;
+        }
+    }
+    public static get enableTextWidthCache():boolean {
+        return this._enableTextWidthCache;
+    }
+    /**文本宽度缓存 - 最大上限 */
+    public static textWidthCacheMax = 5000;
+    /**文本宽度缓存 - 到达最大上限后删除多少个*/
+    public static textWidthCacheClear = 1000;
+    
+    /**caochangli - 测量文本尺寸：利用缓存机制 */
+    public static measureText(text:string,ctx?:CanvasRenderingContext2D):TextMetrics {
+        let context = ctx || Browser.context;
+        if (!this._enableTextWidthCache)
+            return context.measureText(text);
+        let key = `${context.font}_${text}`;
+        let ret = this._textWidthMap.get(key);
+        if (ret === undefined) {
+            ret = context.measureText(text);
+            if (ret) {
+                this._textWidthMap.set(key,ret);
+                this._textWidthOrder.push(key);
+                // 缓存超过上限 - 清理一部分
+                if (this._textWidthMap.size > TextRender.textWidthCacheMax) {
+                    let clearCount = TextRender.textWidthCacheClear;
+                    for (let i = 0; i < clearCount; i++) {
+                        let oldKey = this._textWidthOrder[i];
+                        if (oldKey) this._textWidthMap.delete(oldKey);
+                    }
+                    this._textWidthOrder.splice(0, clearCount);
+                }
+            }
+        } else {
+            // 将新使用的key放到最后
+            let index = this._textWidthOrder.indexOf(key);
+            if (index >= 0) {
+                let lastIndex = this._textWidthOrder.length - 1;
+                if (index !== lastIndex) {
+                    this._textWidthOrder[index] = this._textWidthOrder[lastIndex];
+                    this._textWidthOrder[lastIndex] = key;
+                }
+            }
+        }
+        return ret;
+    }
+//#endregion caochangli - 缓存文本宽度
+
 }
 
 const blockGap = 1;

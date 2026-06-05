@@ -6,6 +6,7 @@ import { IGraphicsBoundsAssembler, IGraphicsCmd } from "../IGraphics";
 import { Browser } from "../../utils/Browser";
 import { GraphicsRunner } from "../Scene2DSpecial/GraphicsRunner";
 import { Render2DProcessor } from "../Render2DProcessor";
+import { TextRender } from "../../webgl/text/TextRender";
 
 const className = "FillTextCmd";
 
@@ -246,7 +247,7 @@ export class FillTextCmd implements IGraphicsCmd {
 
         let ctx = Browser.context;
         ctx.font = this.font;
-        return ctx.measureText(this.text).width;
+        return TextRender.measureText(this.text,ctx).width;//ctx.measureText(this.text).width;
     }
 
     /**

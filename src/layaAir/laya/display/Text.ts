@@ -1842,7 +1842,7 @@ export class Text extends Sprite {
         if (this._bitmapFont)
             return this._bitmapFont.getTextWidth(text, this.layout_fontSize);
         else {
-            let ret = Browser.context.measureText(text);
+            let ret = TextRender.measureText(text);//Browser.context.measureText(text);
             return ret ? ret.width : 100;
         }
     }
@@ -1853,7 +1853,7 @@ export class Text extends Sprite {
         else {
             let t = Browser.context.font;
             Browser.context.font = font;
-            let ret = Browser.context.measureText(text);
+            let ret = TextRender.measureText(text);//Browser.context.measureText(text);
             Browser.context.font = t;
             return ret ? ret.width : 100;
         }
