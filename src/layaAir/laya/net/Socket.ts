@@ -169,21 +169,26 @@ export class Socket extends EventDispatcher {
             console.warn("WebSocket is not supported in this platform.");
             return;
         }
+        // caochangli - socket.close()后，存在被关闭后的close继续执行其open、close事件
+        const _skt = this._socket;
         this._socket.onOpen = () => {
+            if (this._socket !== _skt) return;
             this._connected = true;
             this.event(Event.OPEN);
         };
         this._socket.onClose = () => {
+            if (this._socket !== _skt) return;
             this._connected = false;
             this.event(Event.CLOSE);
         };
         this._socket.onError = (e: any) => {
+            if (this._socket !== _skt) return;
             if (this.hasListener(Event.ERROR))
                 this.event(Event.ERROR, e);
             else
                 console.error("Socket Error: " + getErrorMsg(e));
         };
-        this._socket.onMessage = (msg: string | ArrayBuffer) => this._onMessage(msg);
+        this._socket.onMessage = (msg: string | ArrayBuffer) => { if (this._socket === _skt) this._onMessage(msg); };
         this._socket.open(url, options);
     }
 
