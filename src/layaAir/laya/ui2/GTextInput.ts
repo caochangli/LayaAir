@@ -375,6 +375,35 @@ export class GTextInput extends GWidget {
         this.textIns.focus = false;
     }
 
+    /**
+     * caochangli桥接 - 图文混排时图片和文字的对齐方式。可选值是 top, middle, bottom。
+     */
+    get alignItems(): string {
+        return this.textIns.alignItems;
+    }
+
+    set alignItems(value: string) {
+        this.textIns.alignItems = value;
+    }
+
+    /**
+     * caochangli桥接 - 指定文本超出文本域后的行为。
+     * 值为：可见visible、隐藏hidden、滚动scroll、自动收缩shrink、显示省略号ellipsis。
+     * 作用：
+     * - 可见：文本不受文本宽高约束全部可见。
+     * - 隐藏：超过文本宽高就会被裁切掉，性能最好。
+     * - 滚动：超出宽高的部分被隐藏，可以通过划动控制显示在宽高内区域。
+     * - 自动收缩：文本会跟随宽高的大小而自动调整文本的大小，始终全部显示在文本宽高内。
+     * - 显示省略号：当文本超出宽高后，未尾的几位字符会替换为省略号，表示当前文本还有未显示的内容。
+     */
+    get overflow(): string {
+        return this.textIns.overflow;
+    }
+
+    set overflow(value: string) {
+        this.textIns.overflow = value;
+    }
+
     /** @ignore */
     protected _transChanged(kind: TransformKind): void {
         super._transChanged(kind);

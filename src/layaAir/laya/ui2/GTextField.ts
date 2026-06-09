@@ -1,5 +1,5 @@
 import { GWidget } from "./GWidget";
-import { Text } from "../display/Text";
+import { ITextLine, Text } from "../display/Text";
 import { HideFlags, NodeFlags } from "../Const";
 import { TextFitContent } from "./Const";
 import { SerializeUtil } from "../loaders/SerializeUtil";
@@ -425,6 +425,14 @@ export class GTextField extends GWidget {
         this.textIns.setVar(name, value);
 
         return this;
+    }
+
+    /**
+     * caochangli桥接 - 文字行信息。
+     */
+    get lines():ReadonlyArray<ITextLine>
+    {
+        return this.textIns.lines;
     }
 
     /**

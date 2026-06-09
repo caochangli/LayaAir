@@ -769,6 +769,10 @@ export class Text extends Sprite {
             }
             else
                 this.scrollRect = null;
+
+            // caochangli - 修改此属性时需要重新布局
+            if (this._text)
+                this.markChanged();
         }
     }
 
@@ -1612,10 +1616,6 @@ export class Text extends Sprite {
         let rectHeight = this._isHeightSet ? (this._height - this.layout_padding[0] - this.layout_padding[2]) : Number.MAX_VALUE;
         this.layout_alignItems = this._textStyle.alignItems == "middle" ? 1 : (this._textStyle.alignItems == "bottom" ? 2 : 0);
         
-        // this.layout_lineX = this.layout_lineY = undefined;
-        // this.layout_curLine = undefined;
-        // this.layout_lastCmd = undefined;
-        // this.layout_charWidth = this.layout_charHeight = undefined;
         this.layout_fontSize = undefined;
         this.layout_ctxFont = undefined;
         this.layout_textRender = Render2DProcessor.runner._textRender;
@@ -1624,21 +1624,12 @@ export class Text extends Sprite {
         this.doLayoutRun();
         
         // 执行完毕 - 桥接方法和值给下面逻辑使用
-        let getTextWidth2 = this.getTextWidth2;
-        let addLine = this.addLine;
-        let calcTextSize = this.calcTextSize;
-        let run = this.doLayoutRun;
         let padding = this.layout_padding;
         let rectWidth = this.layout_rectWidth;
         let charHeight = this.layout_charHeight;
         let curLine = this.layout_curLine;
         let fontSize = this.layout_fontSize;
         let ctxFont = this.layout_ctxFont;
-        // 执行完毕 - 清理持有的对象
-        this.layout_padding = undefined;
-        this.layout_curLine = undefined;
-        this.layout_lastCmd = undefined;
-        this.layout_textRender = undefined;
 //#endregion caochangli - 采用独立方法优化写法
 
         
@@ -1653,7 +1644,7 @@ export class Text extends Sprite {
                 let cur = Math.floor(this._fontSizeScale * this._textStyle.fontSize);
 
                 while (true) {
-                    run();
+                    this.doLayoutRun();// run();
 
                     if (this._textWidth > rectWidth || this._textHeight > rectHeight)
                         high = cur;
@@ -1670,7 +1661,7 @@ export class Text extends Sprite {
             else if (this._textWidth > rectWidth) {
                 this._fontSizeScale = rectWidth / this._textWidth;
 
-                run();
+                this.doLayoutRun();// run();
 
                 if (this._textWidth > rectWidth) //如果还超出，缩小一点再来一次
                 {
@@ -1678,7 +1669,7 @@ export class Text extends Sprite {
                     size--;
                     this._fontSizeScale = size / this._textStyle.fontSize;
 
-                    run();
+                    this.doLayoutRun();// run();
                 }
             }
         }
@@ -1743,17 +1734,17 @@ export class Text extends Sprite {
                         }
                         cmd.text = cmd.text.substring(0, i) + ellipsisStr;
                     }
-                    cmd.width = getTextWidth2(cmd.text, cmd.ctxFont, cmd.fontSize);
+                    cmd.width = this.getTextWidth2(cmd.text, cmd.ctxFont, cmd.fontSize);
                     cmd.next = null;
                     done = true;
-                    addLine(true);//重新计算最后一行行高
+                    this.addLine(true);//重新计算最后一行行高
                 }
 
                 cmd = next;
             }
 
             if (done || linesDeleted)
-                calcTextSize();
+                this.calcTextSize();
         }
 
         if (this._onPostLayout)
@@ -1820,6 +1811,13 @@ export class Text extends Sprite {
         }
 
         this._updatingLayout = false;
+
+        // caochangli 执行完毕 - 清理持有的对象
+        this.layout_padding = undefined;
+        this.layout_curLine = undefined;
+        this.layout_lastCmd = undefined;
+        this.layout_textRender = undefined;
+        // caochangli 执行完毕 - 清理持有的对象
 
         this.renderText();
     }
@@ -2419,6 +2417,12 @@ export class Text extends Sprite {
         [Event.CHANGE]: () => void;
         [Event.LINK]: (href: string) => void;
     }
+
+    // caochangli - 给重写的GTextField使用
+    static get bitmapFonts():Record<string, BitmapFont>
+    {
+        return Text._bitmapFonts;
+    }
 }
 
 export interface ITextCmd {
@@ -2445,10 +2449,11 @@ export interface ITextLine {
     cmd: ITextCmd;
 }
 
-const cmdPool: Array<ITextCmd> = [];
-const linePool: Array<ITextLine> = [];
+// caochangli - 下面定义增加export，给重写的GTextField使用
+export const cmdPool: Array<ITextCmd> = [];
+export const linePool: Array<ITextLine> = [];
 
-function recoverLines(lines: Array<ITextLine>, releaseObjs?: boolean) {
+export function recoverLines(lines: Array<ITextLine>, releaseObjs?: boolean) {
     for (let line of lines) {
         let cmd = line.cmd;
         while (cmd) {
@@ -2463,7 +2468,7 @@ function recoverLines(lines: Array<ITextLine>, releaseObjs?: boolean) {
     lines.length = 0;
 }
 
-function cleanCmd(cmd: ITextCmd, releaseObj: boolean) {
+export function cleanCmd(cmd: ITextCmd, releaseObj: boolean) {
     if (cmd.obj) {
         if (releaseObj) {
             cmd.obj.element.obj = null;
@@ -2474,23 +2479,23 @@ function cleanCmd(cmd: ITextCmd, releaseObj: boolean) {
     }
 }
 
-const emojiTest = /[\uD800-\uDBFF][\uDC00-\uDFFF]/;
-const wordBoundaryTest = /[a-zA-Z0-9\!-\+\/_]+$/;
-const punctuationChars = Array.from(".,，。、!！；;”’)）]】}》").map(char => char.charCodeAt(0));
-const normalizeCR = /\r\n/g;
-const escapeCharsPattern = /\\(\w)/g;
-const escapeSequence: any = { "\\n": "\n", "\\t": "\t" };
-const ellipsisStr = "…";
-const maxWordLength = 20;
+export const emojiTest = /[\uD800-\uDBFF][\uDC00-\uDFFF]/;
+export const wordBoundaryTest = /[a-zA-Z0-9\!-\+\/_]+$/;
+export const punctuationChars = Array.from(".,，。、!！；;”’)）]】}》").map(char => char.charCodeAt(0));
+export const normalizeCR = /\r\n/g;
+export const escapeCharsPattern = /\\(\w)/g;
+export const escapeSequence: any = { "\\n": "\n", "\\t": "\t" };
+export const ellipsisStr = "…";
+export const maxWordLength = 20;
 
-function getReplaceStr(word: string): string {
+export function getReplaceStr(word: string): string {
     return escapeSequence[word];
 }
 
-function isHighSurrogate(c: number): boolean {
+export function isHighSurrogate(c: number): boolean {
     return c >= 0xD800 && c <= 0xDBFF;
 }
 
-function isLowSurrogate(c: number): boolean {
+export function isLowSurrogate(c: number): boolean {
     return c >= 0xDC00 && c <= 0xDFFF; 
 }
