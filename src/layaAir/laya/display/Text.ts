@@ -2449,11 +2449,10 @@ export interface ITextLine {
     cmd: ITextCmd;
 }
 
-// caochangli - 下面定义增加export，给重写的GTextField使用
-export const cmdPool: Array<ITextCmd> = [];
-export const linePool: Array<ITextLine> = [];
+const cmdPool: Array<ITextCmd> = [];
+const linePool: Array<ITextLine> = [];
 
-export function recoverLines(lines: Array<ITextLine>, releaseObjs?: boolean) {
+function recoverLines(lines: Array<ITextLine>, releaseObjs?: boolean) {
     for (let line of lines) {
         let cmd = line.cmd;
         while (cmd) {
@@ -2468,7 +2467,7 @@ export function recoverLines(lines: Array<ITextLine>, releaseObjs?: boolean) {
     lines.length = 0;
 }
 
-export function cleanCmd(cmd: ITextCmd, releaseObj: boolean) {
+function cleanCmd(cmd: ITextCmd, releaseObj: boolean) {
     if (cmd.obj) {
         if (releaseObj) {
             cmd.obj.element.obj = null;
@@ -2479,23 +2478,45 @@ export function cleanCmd(cmd: ITextCmd, releaseObj: boolean) {
     }
 }
 
-export const emojiTest = /[\uD800-\uDBFF][\uDC00-\uDFFF]/;
-export const wordBoundaryTest = /[a-zA-Z0-9\!-\+\/_]+$/;
-export const punctuationChars = Array.from(".,，。、!！；;”’)）]】}》").map(char => char.charCodeAt(0));
-export const normalizeCR = /\r\n/g;
-export const escapeCharsPattern = /\\(\w)/g;
-export const escapeSequence: any = { "\\n": "\n", "\\t": "\t" };
-export const ellipsisStr = "…";
-export const maxWordLength = 20;
+const emojiTest = /[\uD800-\uDBFF][\uDC00-\uDFFF]/;
+const wordBoundaryTest = /[a-zA-Z0-9\!-\+\/_]+$/;
+const punctuationChars = Array.from(".,，。、!！；;”’)）]】}》").map(char => char.charCodeAt(0));
+const normalizeCR = /\r\n/g;
+const escapeCharsPattern = /\\(\w)/g;
+const escapeSequence: any = { "\\n": "\n", "\\t": "\t" };
+const ellipsisStr = "…";
+const maxWordLength = 20;
 
-export function getReplaceStr(word: string): string {
+function getReplaceStr(word: string): string {
     return escapeSequence[word];
 }
 
-export function isHighSurrogate(c: number): boolean {
+function isHighSurrogate(c: number): boolean {
     return c >= 0xD800 && c <= 0xDBFF;
 }
 
-export function isLowSurrogate(c: number): boolean {
+function isLowSurrogate(c: number): boolean {
     return c >= 0xDC00 && c <= 0xDFFF; 
 }
+
+
+// caochangli - 定义增加export，给重写的GTextField使用
+export const Text_cmdPool = cmdPool;
+export const Text_linePool = linePool;
+
+export const Text_recoverLines = recoverLines;
+export const Text_cleanCmd = cleanCmd;
+
+export const Text_emojiTest = emojiTest;
+export const Text_wordBoundaryTest = wordBoundaryTest;
+export const Text_punctuationChars = punctuationChars;
+export const Text_normalizeCR = normalizeCR;
+export const Text_escapeCharsPattern = escapeCharsPattern;
+export const Text_escapeSequence = escapeSequence;
+export const Text_ellipsisStr = ellipsisStr;
+export const Text_maxWordLength = maxWordLength;
+
+export const Text_getReplaceStr = getReplaceStr;
+export const Text_isHighSurrogate = isHighSurrogate;
+export const Text_isLowSurrogate = isLowSurrogate;
+// caochangli - 定义增加export，给重写的GTextField使用
