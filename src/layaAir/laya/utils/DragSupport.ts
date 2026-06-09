@@ -85,6 +85,11 @@ export class DragSupport {
     start(data?: any): void {
         this.reset();
 
+        // caochangli - 报错处理
+        if (!this.target || !this.target._parent)
+            return;
+        // caochangli - 报错处理
+
         this._touchId = ILaya.InputManager.lastTouchId;
         this._dragging = true;
         this._testing = false;
@@ -143,6 +148,11 @@ export class DragSupport {
         if (this._touchId != evt.touchId)
             return;
 
+        // caochangli - 报错处理
+        if (!this.target || !this.target._parent)
+            return;
+        // caochangli - 报错处理
+        
         let point: Point = this.target._parent.getMousePoint();
         let mouseX: number = point.x;
         let mouseY: number = point.y;

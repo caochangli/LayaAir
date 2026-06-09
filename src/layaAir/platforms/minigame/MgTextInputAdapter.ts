@@ -33,7 +33,7 @@ export class MgTextInputAdapter extends TextInputAdapter {
 
     protected onCanShowKeyboard(): Promise<void> {
         let target = this.target;
-        if (!target.editable || !MgTextInputAdapter.enabled)
+        if (!target || !target.editable || !MgTextInputAdapter.enabled)
             return Promise.resolve();
 
         return new Promise<any>((resolve, reject) => {

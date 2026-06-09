@@ -305,6 +305,9 @@ export class Sprite extends Node {
         //清理缓动
         Tween.killAll(this);
 
+        //停止可能的拖动
+        this.stopDrag();
+
         // //删除我监听别人的所有事件
         // this.offAllLogicListener();
         // //删除别人监听我的所有事件
