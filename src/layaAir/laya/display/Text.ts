@@ -90,7 +90,7 @@ export class Text extends Sprite {
      * @en Dictionary of bitmap fonts.
      * @zh 位图字体字典。
      */
-    private static _bitmapFonts: Record<string, BitmapFont> = {};
+    static _bitmapFonts: Record<string, BitmapFont> = {};
 
     /**
      * @en Mark whether this text ignores the language pack.
@@ -2416,12 +2416,6 @@ export class Text extends Sprite {
     Text_bpEvent: {
         [Event.CHANGE]: () => void;
         [Event.LINK]: (href: string) => void;
-    }
-
-    // caochangli - 给重写的GTextField使用
-    static get bitmapFonts():Record<string, BitmapFont>
-    {
-        return Text._bitmapFonts;
     }
 }
 

@@ -36,7 +36,7 @@ export interface IHtmlObject {
      * @param owner HTML 对象的所有者。
      * @param element 用于创建对象的 HTML 元素。
      */
-    create(owner: Text, element: HtmlElement): void;
+    create(owner: Text | any, element: HtmlElement): void;
     /**
      * @en Positions the HTML object at the specified coordinates.
      * @param x The x-coordinate.
