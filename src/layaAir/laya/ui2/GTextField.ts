@@ -177,7 +177,6 @@ export class GTextField extends GWidget {
         this._fontSizeScale = 1;
         this.graphics._useSpriteRect = true;
 
-        this.hideFlags |= HideFlags.HideAndDontSave;
         this.padding.fill(2);
         this._onTranslate = Translations.translate;
     }
