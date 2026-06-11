@@ -316,6 +316,9 @@ export class XMLIterator {
             else
                 return XMLUtils.decodeString(this.source.substring(i, this.tagPos)).trimEnd();
         }
+        // caochangli - 原字符串返回，优化性能
+        else if (this.lastTagEnd == 0 && this.tagPos >= this.sourceLen)
+            return XMLUtils.decodeString(this.source);
         else
             return XMLUtils.decodeString(this.source.substring(this.lastTagEnd, this.tagPos));
     }

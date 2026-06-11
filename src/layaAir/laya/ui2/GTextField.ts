@@ -163,6 +163,9 @@ export class GTextField extends GWidget {
     private _fitContent: TextFitContent = 0;
     private _fitFlag: boolean;
 
+    /**caochangli - 是否存在uub标签 */
+    private _existUBBTag:boolean;
+
     constructor() {
         super();
 
@@ -286,6 +289,7 @@ export class GTextField extends GWidget {
 
         if (this._text != value) {
             this._text = value;
+            this._existUBBTag = false;//caochangli
             this.markChanged();
             this.event(Event.CHANGE);
         }
@@ -437,8 +441,8 @@ export class GTextField extends GWidget {
     set color(value: string) {
         if (this._textStyle.color != value) {
             this._textStyle.color = value;
-            //如果仅仅更新颜色，无需重新排版
-            if (!this._isChanged && !this._html && !this._ubb)
+            //如果仅仅更新颜色，无需重新排版 - caochangli：仅勾选ubb但没ubb标签按常规文本处理
+            if (!this._isChanged && !this._html && (!this._ubb || !this._existUBBTag))
                 this._graphics.replaceTextColor(this._textStyle.color);
             else
                 this.markChanged();
@@ -1045,7 +1049,10 @@ export class GTextField extends GWidget {
 
         if (this._ubb) {
             text = UBBParser.defaultParser.parse(text);
-            html = true;
+            // caochangli - 存在uub标签，才转换为html处理
+            this._existUBBTag = UBBParser.defaultParser.existUBBTag;
+            if (this._existUBBTag)
+                html = true;
         }
         if (!isPrompt && this._asPassword)
             text = Text._passwordChar.repeat(text.length);

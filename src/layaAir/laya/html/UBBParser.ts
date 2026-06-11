@@ -40,6 +40,11 @@ export class UBBParser {
     public lastSize: string;
 
     /**
+     * caochangli - 是否存在uub标签
+     */
+    public existUBBTag:boolean;
+
+    /**
      * @ignore
      * @en Creates an instance of the `UBBParser` class.
      * @zh 创建 `UBBParser` 类的实例。
@@ -163,6 +168,7 @@ export class UBBParser {
      * @returns 生成的 HTML 字符串。
      */
     public parse(text: string, remove?: boolean): string {
+        this.existUBBTag = true;//caochangli - 默认设置为有uub标签
         this._text = text;
         this.lastColor = null;
         this.lastSize = null;
@@ -212,9 +218,16 @@ export class UBBParser {
             pos1 = this._readPos;
         }
 
-        if (pos1 < text.length)
-            result += text.substring(pos1);
-
+        if (pos1 < text.length) {
+            // caochangli - 原字符串返回，优化性能
+            if (!result && pos1 == 0) {
+                this.existUBBTag = false;//caochangli - 没有uub标签
+                result = text;
+            }
+            else
+                result += text.substring(pos1);
+        }
+            
         this._text = null;
 
         return result;

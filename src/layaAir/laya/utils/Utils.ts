@@ -375,8 +375,13 @@ export class Utils {
             pos1 = pos2 + 1;
         }
 
-        if (pos1 < template.length)
-            result += template.substring(pos1);
+        if (pos1 < template.length) {
+             // caochangli - 原字符串返回，优化性能
+            if (!result && pos1 == 0)
+                result = template;
+            else
+                result += template.substring(pos1);
+        }
 
         return result;
     }
