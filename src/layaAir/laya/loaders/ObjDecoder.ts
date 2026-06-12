@@ -90,7 +90,7 @@ export class ObjDecoder {
                 let url = URL.getResURLByUUID(data._$uuid);
                 
                 // caochangli - 预览模式图片中散图因uuid和路径映射关系还没有,获取不到纹理问题修复，如：GWidget.background中texture纹理
-                if (data._$type == "Texture" && LayaEnv.isPreview)
+                if (LayaEnv.isPreview && data._$type == "Texture")
                 {
                     let texture = ILaya.loader.getRes(url, Loader.assetTypeToLoadType[data._$type]);
                     if (!texture)

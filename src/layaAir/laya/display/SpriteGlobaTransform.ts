@@ -363,8 +363,11 @@ export class SpriteGlobalTransform {
      */
     private _syncFlag(flag: number, value: boolean) {
         if (this._cache) {
-            for (let child of this._sp._children) {
-                let globaltrans = child.globalTrans
+            // for (let child of this._sp._children) {
+            // caochangli - for of 改为 for
+            for (let i = 0,length = this._sp._children.length; i < length; i++) {
+                let child = this._sp._children[i];
+                let globaltrans = child.globalTrans;
                 if (globaltrans) {
                     globaltrans._setFlag(flag, value);
                     globaltrans._syncFlag(flag, value);

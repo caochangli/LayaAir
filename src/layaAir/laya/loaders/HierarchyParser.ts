@@ -16,24 +16,59 @@ import { SerializeUtil } from "./SerializeUtil";
 const excludeKeys = new Set(["x", "y", "width", "height", "controllers", "relations", "gears"]);
 
 export class HierarchyParser {
+
+    // caochangli - 池化反序列化时用到的临时对象
+    private static _arrayList:Array<Array<any>> = [];
+    private static getArray():Array<any>
+    {
+        if (this._arrayList.length > 0)
+            return this._arrayList.pop();
+        return new Array();
+    }
+    private static recycleArray(array:Array<any>):void
+    {
+        if (array)
+        {
+            array.length = 0;
+            this._arrayList.push(array);
+        }
+    }
+    private static _mapList:Array<any> = [];
+    private static getPrefabNodeMap():Map<Node, Record<string, Node>>
+    {
+        if (this._mapList.length > 0)
+            return this._mapList.pop();
+        return new Map();
+    }
+    private static recyclePrefabNodeMap(map:Map<Node, Record<string, Node>>):void
+    {
+        if (map)
+        {
+            map.clear();
+            this._mapList.push(map);
+        }
+    }
+    // caochangli - 池化反序列化时用到的临时对象
+
     public static parse(data: any, options?: Record<string, any>, errors?: Array<any>): Array<Node> {
         let printErrors = errors == null;
-        errors = errors || [];
+        errors = errors || this.getArray();//[];
         let nodeMap: Record<string, Node> = {};
-        let dataList: Array<any> = [];
-        let allNodes: Array<Node> = [];
+        let dataList: Array<any> = this.getArray();//[];
+        let allNodes: Array<Node> = this.getArray();//[];
         let outNodes: Array<Node> = [];
-        let toDestroy: Array<string> = [];
+        let toDestroy: Array<string> = this.getArray();//[];
         let scene: Scene;
 
         let inPrefab: boolean;
         let prefabNodeDict: Map<Node, Record<string, Node>>;
+        let isNewPrefabNodeDict:boolean;
         let skinBaseUrl: string;
         let overrideData: Array<Array<any>>;
         let hasRuntime: boolean;
         let hasUI: boolean;
         //#region liurui 记录自定义类节点，方便后续绑定
-        let customScriptNodesObj: Record<string, Node[]> = {};
+        let customScriptNodeDic: Record<string, Node[]>;
         //#endregion liurui 记录自定义类节点，方便后续绑定
 
         if (options) {
@@ -46,7 +81,10 @@ export class HierarchyParser {
 
         function createChildren(data: any, prefab: Node, customScript?: string) {
             //#region liurui 记录自定义类节点，方便后续绑定
-            for (let child of data._$child) {
+            // for (let child of data._$child) {
+            // caochangli - for of 改成 for
+            for (let childIndex = 0,childCnt = data._$child.length; childIndex < childCnt; childIndex++) {
+                let child = data._$child[childIndex];
                 let node;
                 if (child._$child) {
                     node = createNode(child, prefab);
@@ -59,9 +97,12 @@ export class HierarchyParser {
                     customScript = customScript || data.customScript;
                     if (customScript && node) {
                         // 自定义类绑定子节点
-                        if (!customScriptNodesObj[customScript])
-                            customScriptNodesObj[customScript] = [];
-                        customScriptNodesObj[customScript].push(node);
+                        if (!customScriptNodeDic)
+                            customScriptNodeDic = {};
+                        let customScriptList = customScriptNodeDic[customScript];
+                        if (!customScriptList)
+                            customScriptNodeDic[customScript] = customScriptList = HierarchyParser.getArray();//[];
+                        customScriptList.push(node);
                         (node as any).__isNotNeedBindToTopNode = true;
                     }
                     dataList.push(child);
@@ -104,10 +145,13 @@ export class HierarchyParser {
                 if (pstr = nodeData._$prefab) { //prefab根节点
                     let res = <Prefab>Loader.getRes(URL.getResURLByUUID(pstr), Loader.HIERARCHY);
                     if (res) {
-                        if (!prefabNodeDict)
-                            prefabNodeDict = new Map();
-
-                        let overrideData2: Array<any> = [];
+                        if (!prefabNodeDict) {
+                            isNewPrefabNodeDict = true;
+                            prefabNodeDict = HierarchyParser.getPrefabNodeMap();//new Map();
+                        }
+                        
+                        // caochangli - overrideData2被递归使用的，如果有问题，改回不使用对象池
+                        let overrideData2: Array<any> = HierarchyParser.getArray();//[];
                         let testId = nodeData._$id;
                         if (overrideData) {
                             for (let i = 0, n = overrideData.length; i < n; i++) {
@@ -277,7 +321,7 @@ export class HierarchyParser {
 
         //生成树
         let k = 0;
-        let outNodeData: Array<any> = [];
+        let outNodeData: Array<any> = this.getArray();//[];
         for (let i = 0; i < nodeCnt; i++) {
             let nodeData = dataList[i];
             let node = allNodes[i];
@@ -327,12 +371,23 @@ export class HierarchyParser {
             outNodeData[k] = nodeData;
             k++;
         }
-        outNodes.length = k;
-        outNodes = outNodes.filter(n => n != null);
+        this.recycleArray(outNodeData);
+
+        // outNodes.length = k;
+        // outNodes = outNodes.filter(n => n != null);
+        // caochangli - 不创建新数组，在原数组上改值
+        let p = 0;
+        let outNode;
+        for (let i = 0; i < k; i++) {
+            outNode = outNodes[i];
+            if (outNode != null) 
+                outNodes[p++] = outNode;
+        }
+        outNodes.length = p;
         let topNode = outNodes[0];
 
         //加载所有组件
-        let compInitList: Array<any> = [];
+        let compInitList: Array<any> = this.getArray();//[];
         for (let i = 0; i < nodeCnt; i++) {
             let components = dataList[i]._$comp;
             if (!components)
@@ -342,7 +397,10 @@ export class HierarchyParser {
             if (!node)
                 continue;
 
-            for (let compData of components) {
+            // for (let compData of components) {
+            // caochangli - for of 改成 for
+            for (let componentIndex = 0,componentCnt = components.length; componentIndex < componentCnt; componentIndex++) {
+                let compData = components[componentIndex];
                 let comp: Component;
                 let typeOrId = compData._$override;
                 if (compData._$override) {
@@ -429,12 +487,23 @@ export class HierarchyParser {
                             (<any>topNode)[node.name] = node;
                         }
                         // 检测是否是自定义类，如果是，则绑定到自定义类里面
-                        if ((node as any)._customScript && customScriptNodesObj[(node as any)._customScript]) {
-                            let customScriptNodes = customScriptNodesObj[(node as any)._customScript];
-                            for (let n of customScriptNodes) {
-                                (<any>node)[n.name] = n;
+                        if ((node as any)._customScript && customScriptNodeDic) {
+                            let customScriptNodes =  customScriptNodeDic[(node as any)._customScript];
+                            if (customScriptNodes)
+                            {
+                                for (let csIndex = 0,cscriptCnt = customScriptNodes.length; csIndex < cscriptCnt; csIndex++) {
+                                    let csNode = customScriptNodes[csIndex];
+                                    (<any>node)[csNode.name] = csNode;
+                                }
+                                // delete customScriptNodeDic[(node as any)._customScript];
+                                let key = (node as any)._customScript;
+                                let arr = customScriptNodeDic[key];
+                                if (arr)
+                                {
+                                    delete customScriptNodeDic[key];
+                                    this.recycleArray(arr);
+                                }
                             }
-                            delete customScriptNodesObj[(node as any)._customScript];
                         }
                         //#endregion liurui 绑定节点
                     }
@@ -452,6 +521,7 @@ export class HierarchyParser {
             let comp = compInitList[i + 1];
             decoder.decodeObj(compData, comp);
         }
+        this.recycleArray(compInitList);
 
         if (hasUI) {
             //第四轮(Gears)
@@ -479,7 +549,10 @@ export class HierarchyParser {
             }
         }
 
-        for (let nodeId of toDestroy) {
+        // for (let nodeId of toDestroy) {
+        // caochangli - for of 改成 for
+        for (let destroyIndex = 0,destroyCnt = toDestroy.length; destroyIndex < destroyCnt; destroyIndex++) {
+            let nodeId = toDestroy[destroyIndex];
             let node = nodeMap[nodeId];
             if (!node._destroyed)
                 node.destroy();
@@ -492,6 +565,26 @@ export class HierarchyParser {
 
         if (printErrors && errors.length > 0)
             errors.forEach(err => console.error(err));
+
+        // caochangli - 回收到对象池
+        if (printErrors)
+            this.recycleArray(errors);
+        this.recycleArray(dataList);
+        this.recycleArray(allNodes);
+        this.recycleArray(toDestroy);
+        // caochangli - overrideData被递归使用的，如果有问题，改回不使用对象池
+        this.recycleArray(overrideData);
+        if (isNewPrefabNodeDict)
+            this.recyclePrefabNodeMap(prefabNodeDict);
+        if (customScriptNodeDic) {
+            for (let key in customScriptNodeDic) {
+                let arr =  customScriptNodeDic[key];
+                if (arr)
+                    this.recycleArray(arr);
+            }
+            customScriptNodeDic = null;
+        }
+        // caochangli - 回收到对象池
 
         return outNodes;
     }
@@ -575,7 +668,10 @@ export class HierarchyParser {
                     // if (key == "_$override")
                     //     prefabChildOverride(data);
 
-                    for (let item of child) {
+                    // for (let item of child) {
+                    // caochangli - for of 改成 for
+                    for (let itemIndex = 0,itemCnt = child.length; itemIndex < itemCnt; itemIndex++) {
+                        let item = child[itemIndex];
                         if (item == null)
                             continue;
                         typeStr = typeof (item);
@@ -601,13 +697,6 @@ export class HierarchyParser {
                     else if (typeStr === "string") {
                         if (key == "_$id" || key == "name" || key == "_$type" || key == "_$prefab") {}
                         else {
-                            // if (data._$prefab) {
-                            //     prefabOverride(key,child);
-                            // }
-                            // if (key == "_$override") {
-                            //     prefabChildOverride(data);
-                            // }
-                            // else 
                                 if (child.startsWith("i18n:")) {
                                 let i = child.indexOf(":", 5);
                                 if (i != -1)
@@ -619,42 +708,6 @@ export class HierarchyParser {
             }
         }
 
-        // caochangli - 补充资源依赖处理
-        function prefabOverride(key:string,value:string) {
-            let ext = Utils.getFileExtension(value);
-            if (ext)
-            {
-                if (ext == "png" || ext == "jpg")
-                {
-
-                }
-                else if (ext == "skel")
-                {
-                    
-                }
-            }
-        }
-        function prefabChildOverride(data:any) {
-            for (let key in data) {
-                let value = data[key];
-                if (!value || key == "_$override")
-                    continue;
-                if (typeof (value) !== "string")
-                    continue;
-                let ext = Utils.getFileExtension(value);
-                if (ext)
-                {
-                    if (ext == "png" || ext == "jpg")
-                    {
-
-                    }
-                    else if (ext == "skel")
-                    {
-
-                    }
-                }
-            }
-        }
         function supplementInner(type:string,data:any) {
             if (type == "Sprite") {
                 if (data.texture)
