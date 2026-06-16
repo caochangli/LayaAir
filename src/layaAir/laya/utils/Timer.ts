@@ -29,7 +29,7 @@ export class Timer {
     currFrame: number = 0;
     /**
      * @en The time interval between two frames, in milliseconds.
-     * @zh 两帧之间的时间间隔，单位毫秒。
+     * @zh 两帧之间的时间间隔，单位毫秒。(本质上是上一帧用的时间)
      */
     delta: number = 0;
     /**
@@ -64,6 +64,13 @@ export class Timer {
      */
     get totalTime(): number {
         return this._lastTimer;
+    }
+
+    /**
+     * 本帧已过时间（单位：毫秒）- 获取时本帧后续可能还有高开销逻辑要执行
+     */
+    get frameElapsed(): number {
+        return performance.now() - this._lastTimer;
     }
 
     /**
