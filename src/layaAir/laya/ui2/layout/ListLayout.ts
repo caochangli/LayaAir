@@ -16,7 +16,7 @@ export class ListLayout extends Layout {
 
     _virtual: boolean;
     _loop: boolean;
-    _realNumItems: number;
+    _realNumItems: number = 0; //caochangli - 默认值0
     _lineItemCnt: number = 0; //item count in one line
     _lineItemCnt2: number; //只用在页面模式，表示垂直方向的项目数
     _items: Array<ItemInfo>;
