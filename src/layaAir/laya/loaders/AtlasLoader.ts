@@ -41,6 +41,21 @@ class AtlasLoader implements IResourceLoader {
                 let directory: string = (data.meta && data.meta.prefix != null) ? data.meta.prefix : task.url.substring(0, task.url.lastIndexOf(".")) + "/";
                 let subTextures: Array<Texture> = [];
 
+                // caochangli - 图集的散图都是相同前缀，这里做个优化减少URL.formatURL调用
+                let jumpFormatURL:boolean = false;
+                let atlasPrefix:string;
+                let urlInfo:{typeId:number,main:boolean};
+                if (!baseUrl && (!data.meta || !data.meta.prefix)) {
+                    // task.url = "res/atlas/login/loginFormal.atlas";
+                    // task.formattedUrl = "https://xclient.sanguosha.com/res/atlas/login/loginFormal-*****.atlas";
+                    
+                    let atlasDir = task.url.substring(0,task.url.lastIndexOf("/") + 1);//res/atlas/login/
+                    atlasPrefix = task.formattedUrl.substring(0,task.formattedUrl.indexOf(atlasDir));//https://xclient.sanguosha.com/
+                    let extEntry = Loader.extMap["png"];
+                    urlInfo = {typeId:extEntry[0].typeId,main:true};
+                    jumpFormatURL = true;
+                }
+
                 let scaleRate: number = 1;
                 if (data.meta && data.meta.scale && data.meta.scale != 1)
                     scaleRate = parseFloat(data.meta.scale);
@@ -58,7 +73,14 @@ class AtlasLoader implements IResourceLoader {
                     let tt = Texture.create(tPic, obj.frame.x, obj.frame.y, obj.frame.w, obj.frame.h, obj.spriteSourceSize.x, obj.spriteSourceSize.y, obj.sourceSize.w, obj.sourceSize.h, obj.rotated);
                     tt._sizeGrid = obj.sizeGrid;
                     tt._stateNum = obj.stateNum;
-                    task.loader.cacheRes(url, tt);
+                    if (!jumpFormatURL)
+                        task.loader.cacheRes(url, tt);
+                    else if (urlInfo.typeId) {//caochangli - 跳过loader.cacheRes中URL.formatURL和Loader.getURLInfo
+                        if (atlasPrefix)
+                            Loader._cacheRes(atlasPrefix + url, tt, urlInfo.typeId, urlInfo.main);
+                        else
+                            Loader._cacheRes(url, tt, urlInfo.typeId, urlInfo.main);
+                    }
                     tt.url = url;
                     subTextures.push(tt);
                 }
