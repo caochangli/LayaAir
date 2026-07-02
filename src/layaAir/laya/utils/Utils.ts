@@ -155,25 +155,44 @@ export class Utils {
      * @blueprintPure
      */
     static getFileExtension(path: string): string {
-        let i = path.lastIndexOf(".");
+        // let i = path.lastIndexOf(".");
 
-        if (i != -1) {
-            let ext = path.substring(i + 1).toLowerCase();
-            let j = ext.indexOf("?");
-            if (j != -1)
-                ext = ext.substring(0, j);
-            if (ext === "ls") { //lanit.ls ltcb.ls 这类特殊扩展名的支持
-                let k = path.lastIndexOf(".", i - 1);
-                if (k != -1) {
-                    let ext2 = path.substring(k + 1, i + 1) + ext;
-                    if (ext2 === "lanit.ls" || ext2 === "ltcb.ls")
-                        return ext2;
-                }
-            }
-            return ext;
-        }
-        else
+        // if (i != -1) {
+        //     let ext = path.substring(i + 1).toLowerCase();
+        //     let j = ext.indexOf("?");
+        //     if (j != -1)
+        //         ext = ext.substring(0, j);
+        //     if (ext === "ls") { //lanit.ls ltcb.ls 这类特殊扩展名的支持
+        //         let k = path.lastIndexOf(".", i - 1);
+        //         if (k != -1) {
+        //             let ext2 = path.substring(k + 1, i + 1) + ext;
+        //             if (ext2 === "lanit.ls" || ext2 === "ltcb.ls")
+        //                 return ext2;
+        //         }
+        //     }
+        //     return ext;
+        // }
+        // else
+        //     return "";
+
+        // caochangli - 性能优化版
+        let i = path.lastIndexOf(".");
+        if (i === -1)
             return "";
+        let j = path.indexOf("?", i + 1);
+        let end = j === -1 ? path.length : j;
+        if (end - i <= 1)
+            return "";
+        let ext = path.substring(i + 1, end).toLowerCase();
+        if (ext === "ls") {
+            let k = path.lastIndexOf(".", i - 1);
+            if (k !== -1) {
+                let ext2 = path.substring(k + 1, i + 1) + ext;
+                if (ext2 === "lanit.ls" || ext2 === "ltcb.ls")
+                    return ext2;
+            }
+        }
+        return ext;
     }
 
     /**
