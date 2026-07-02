@@ -26,6 +26,7 @@ import { StatElement } from "../layagl/StatisticsContext";
 export interface ILoadTask {
     readonly type: string;
     readonly url: string;
+    readonly formattedUrl: string;
     readonly uuid: string;
     readonly ext: string;
     readonly loader: Loader;
@@ -305,7 +306,7 @@ export class Loader extends EventDispatcher {
 
 
 // caochangli
-    private static _textureMeta:any = 
+    public static textureMeta:any = 
     {
         "type": 2,
         "sRGB": true,
@@ -314,6 +315,7 @@ export class Loader extends EventDispatcher {
         "anisoLevel": 1,
         "mipmap": false,
         "pma": true,
+        "hdrEncodeFormat": 0,
         "files": [
             {
                 "file": "",
@@ -334,12 +336,6 @@ export class Loader extends EventDispatcher {
     };
     /**caochangli - 强制使用原图(默认根据平台使用原图或压缩纹理) */
     static forceOrgImage:boolean = false;
-    /**caochangli - 纹理meta */
-    static get textureMeta():any {
-        let meta = this._textureMeta;
-        meta.platforms[1] = meta.platforms[2] = this.forceOrgImage ? 0 : 1;
-        return meta;
-    }
 // caochangli
 
     /**
@@ -560,7 +556,7 @@ export class Loader extends EventDispatcher {
             promise = this._load1(url, type, options, onProgress);
         else
             promise = this._load1(url.url, url.type || type,
-                options !== dummyOptions ? Object.assign({}, options, url) : url, onProgress);
+                options !== dummyOptions ? Object.assign({}, options, url) : url, onProgress, url.formattedUrl);
 
         if (complete)
             return promise.then(result => {
@@ -572,13 +568,13 @@ export class Loader extends EventDispatcher {
     }
 
     /** @internal */
-    _load1(url: string, type: string, options: ILoadOptions, onProgress: ProgressCallback): Promise<any> {
+    _load1(url: string, type: string, options: ILoadOptions, onProgress: ProgressCallback, formattedUrl?: string): Promise<any> {
         if (LayaEnv.isPreview) {
             if (url.startsWith("res://")) {
                 let uuid = url.substring(6);
                 return AssetDb.inst.UUID_to_URL_async(uuid).then(url2 => {
                     if (url2)
-                        return this._load2(url2, uuid, type, options, onProgress);
+                        return this._load2(url2, uuid, type, options, onProgress, formattedUrl);
                     else {
                         !options.silent && Loader.warnFailed(url, undefined, options.initiator?.url);
                         return Promise.resolve(null);
@@ -587,22 +583,25 @@ export class Loader extends EventDispatcher {
             }
             else {
                 return AssetDb.inst.URL_to_UUID_async(url).then(uuid => {
-                    return this._load2(url, uuid, type, options, onProgress);
+                    return this._load2(url, uuid, type, options, onProgress, formattedUrl);
                 });
             }
         }
         else
-            return this._load2(url, null, type, options, onProgress);
+            return this._load2(url, null, type, options, onProgress, formattedUrl);
     }
 
     /** @internal */
-    _load2(url: string, uuid: string, type: string, options: ILoadOptions, onProgress: ProgressCallback): Promise<any> {
+    _load2(url: string, uuid: string, type: string, options: ILoadOptions, onProgress: ProgressCallback, formattedUrl?: string): Promise<any> {
         let { ext, typeId, main, loaderType } = Loader.getURLInfo(url, type, options.maybeType);
         if (!loaderType) {
             !options.silent && Loader.warnFailed(url, type ? `unsupported load type:${type}` : !url.startsWith("res://") ? `unsupported suffix` : "", options.initiator?.url);
             return Promise.resolve(null);
         }
-        let formattedUrl = URL.formatURL(url);
+        // caochangli - 带入了formattedUrl
+        // let formattedUrl = URL.formatURL(url);
+        if (!formattedUrl)
+            formattedUrl = URL.formatURL(url);
 
         if (options.group) {
             let set = Loader.groupMap[options.group];
@@ -665,6 +664,7 @@ export class Loader extends EventDispatcher {
             task = new LoadTask();
         task.type = type;
         task.url = url;
+        task.formattedUrl = formattedUrl;
         task.uuid = uuid;
         task.ext = ext;
         options = Object.assign(task.options, options);
@@ -741,15 +741,19 @@ export class Loader extends EventDispatcher {
      * @param contentType The expected content type of the resource.
      * @param onProgress Optional callback for progress updates.
      * @param options Optional loading options.
-     * @returns A promise that resolves with the downloaded content. If the download fails, the promise resolves with null.
+     * @param loaderTask 可选的下载任务对象
+     * @param compressExt 可选的压缩纹理后缀，如：@1.ktx
+    * @returns A promise that resolves with the downloaded content. If the download fails, the promise resolves with null.
      * @zh 从指定URL下载。这是较为底层的下载资源的方法，它和load方法不同，不对返回的数据进行解析，也不会缓存下载的内容。成功则返回下载的数据，失败返回null。
      * @param url 要下载的URL。
      * @param contentType 预期的资源内容类型。
      * @param onProgress 可选的进度更新回调。
      * @param options 可选的加载选项。
+     * @param loaderTask 可选的下载任务对象
+     * @param compressExt 可选的压缩纹理后缀，如：@1.ktx
      * @returns 解析为下载内容的Promise，加载失败则返回null
      */
-    fetch<K extends keyof ContentTypeMap>(url: string, contentType: K, onProgress?: ProgressCallback, options?: Readonly<ILoadOptions>): Promise<ContentTypeMap[K]> {
+    fetch<K extends keyof ContentTypeMap>(url: string, contentType: K, onProgress?: ProgressCallback, options?: Readonly<ILoadOptions>, loaderTask?:ILoadTask, compressExt?:string): Promise<ContentTypeMap[K]> {
         options = options || dummyOptions;
         let task: DownloadItem = {
             originalUrl: url,
@@ -773,10 +777,34 @@ export class Loader extends EventDispatcher {
         if (options.silent)
             task.silent = true;
 
-        return AssetDb.inst.resolveURL(url).then(url => {
-            if (url)
+        return AssetDb.inst.resolveURL(url).then(url2 => {
+            if (url2)
                 return new Promise((resolve) => {
-                    task.url = URL.formatURL(url);
+                    // task.url = URL.formatURL(url2);
+
+                    // caochangli - 这里URL.formatURL(url2)是为了组装路径(前缀https、版本号)
+                    // 为了减少URL.formatURL执行次数，做如下优化：
+                    // 1. 存在formattedUrl的情况下使用formattedUrl（压缩纹理除外）
+                    // 2. 压缩纹理：压缩纹理版本号记录在原文件后缀路径中
+                    //    url2：                     res/***/Base@1.ktx                    - 不带版本号的压缩纹理后缀路径
+                    //    loaderTask.url：           res/***/Base.png                      - 不带版本号的原文件后缀路径
+                    //    loaderTask.formattedUrl：  https://***/res/***/Base-7608f.png    - 带版本号的原原文件后缀路径
+                    //    result：                   https://***/res/***/Base@1-7608f.ktx  - 带版本号的压缩纹理后缀路径
+                    if (!loaderTask)
+                        task.url = URL.formatURL(url2);
+                    else if (url != url2) {
+                        if (compressExt) {//压缩纹理 - 传入原文件后缀路径获取版本号
+                            let orgExtUrl = url2.replace(compressExt, "."+loaderTask.ext);
+                            task.url = URL.formatURL(url2,null,orgExtUrl);
+                        }
+                        else
+                            task.url = URL.formatURL(url2);
+                    }
+                    else if (compressExt)//压缩纹理 - 传入原文件后缀路径获取版本号
+                        task.url = URL.formatURL(url2,null,loaderTask.url);
+                    else
+                        task.url = loaderTask.formattedUrl || URL.formatURL(url2);
+
                     task.onComplete = resolve;
                     this.queueToDownload(task);
                 });
@@ -1411,6 +1439,12 @@ export class Loader extends EventDispatcher {
 
     /** @ignore */
     _parseFileConfig(fileConfig: any) {
+        // caochangli - 补充纹理meta信息(fileconfig文件中去掉了纹理的通用的meta信息)
+        let textureMeta = Object.assign({}, Loader.textureMeta);
+        delete textureMeta.type;
+        delete textureMeta.generateMipmap;
+        // caochangli - 补充纹理meta信息
+
         let files: Array<string> = [];
         let col = fileConfig.files;
         for (let k in col) {
@@ -1475,6 +1509,9 @@ export class Loader extends EventDispatcher {
             let file = files[m + k];
             switch (c.t) {
                 case 0: //图片
+                    // caochangli - 补充纹理meta信息(fileconfig文件中去掉了纹理的通用的meta信息)
+                    if (!c.files)
+                        Object.assign(c, textureMeta);
                     metaMap[file] = c;
                     break;
                 case 1: //自动图集
@@ -1505,6 +1542,10 @@ class LoadTask implements ILoadTask {
      * @zh 资源的 URL。
      */
     url: string;
+    /**
+     * caochangli - 新增格式化后url
+     */
+    formattedUrl:string;
     /**
      * @en The UUID of the resource.
      * @zh 资源的 UUID。

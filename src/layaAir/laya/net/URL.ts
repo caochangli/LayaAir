@@ -122,9 +122,10 @@ export class URL {
      * 包含normalizedURL功能，并且合并base，如果base没有提供，则使用URL.basePath或者URL.rootPath。
      * @param url 地址。
      * @param base 基础路径，如果没有，则使用URL.basePath或者URL.rootPath。
+     * @param orgExtUrl 原后缀url - 用于处理压缩纹理md5值保存在原png文件上的问题
      * @return 格式化处理后的地址。
      */
-    static formatURL(url: string, base?: string): string {
+    static formatURL(url: string, base?: string, orgExtUrl?: string): string {
         if (!url)
             return base || URL.basePath || "";
 
@@ -137,22 +138,22 @@ export class URL {
             url = url2;
         }
 
-        if (url.indexOf(":") == -1 && url.charCodeAt(0) !== 47) { //已经format过
+        if (url.charCodeAt(0) !== 47 && url.indexOf(":") == -1) { //已经format过
             let url2 = URL.urlMapping[url];
             if (url2)
                 url = url2;
 
             if (URL.customFormat != null)
                 url = URL.customFormat(url);
-
-            let ver = URL.version[url];
+            // caochangli - 通过orgExtUrl解决压缩纹理版本号记录在源文件上问题(减少一步从ktx到png的字符串转换)
+            let ver = orgExtUrl ? URL.version[orgExtUrl] : URL.version[url];
             //yanghui 压缩纹理取源文件版本号
-            if (!ver && url.indexOf("@1.ktx") !== -1) {
-                ver = URL.version[url.replace("@1.ktx", ".png")];
-                if (!ver) {
-                    ver = URL.version[url.replace("@1.ktx", ".jpg")];
-                }
-            }
+            // if (!ver && url.indexOf("@1.ktx") !== -1) {
+            //     ver = URL.version[url.replace("@1.ktx", ".png")];
+            //     if (!ver) {
+            //         ver = URL.version[url.replace("@1.ktx", ".jpg")];
+            //     }
+            // }
             //yanghui 压缩纹理取源文件版本号
             if (ver != null && ver !== "") {
                 let i = url.lastIndexOf(".");

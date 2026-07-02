@@ -20,6 +20,9 @@ import { Utils } from "../utils/Utils";
 
 var internalResources: Record<string, Texture2D>;
 
+//caochangli - 提取RGBA格式的默认文件信息，不在load2中每次都创建临时对象
+const defaultRGBAFile: { format: TextureFormat; file: string; ext: string } = { format: TextureFormat.R8G8B8A8, file: null, ext: null };
+
 export class Texture2DLoader implements IResourceLoader {
     constructor() {
         if (!internalResources) {
@@ -41,7 +44,7 @@ export class Texture2DLoader implements IResourceLoader {
 
         let meta: any;
         if (!task.url.startsWith("data:")) {
-            meta = Loader.forceOrgImage ? null : AssetDb.inst.metaMap[task.url];
+            meta = AssetDb.inst.metaMap[task.url];
             if (!meta && LayaEnv.isPreview) {
                 return AssetDb.inst.getMeta(task.url, task.uuid).then(meta => {
                     return this.load2(task, meta);
@@ -62,14 +65,20 @@ export class Texture2DLoader implements IResourceLoader {
         let propertyParams: TexturePropertyParams;
         let ext = task.ext;
         let url = task.url;
+        //caochangli - 压缩纹理后缀，如：@1.ktx
+        let compressExt:string;
         if (meta) {
-            const RGBA = { format: TextureFormat.R8G8B8A8, file: null as string, ext: null as string };
-            let fileInfo = RGBA;
+            let fileInfo = defaultRGBAFile;
 
             if (meta.platforms && meta.files) {
-                if (Browser.platform in meta.platforms) {
-                    const fileIndex = meta.platforms[Browser.platform];
-                    fileInfo = meta.files[fileIndex];
+                // caochangli - 强制使用原始图片
+                if (Loader.forceOrgImage) {
+                    fileInfo = meta.files[0];
+                } else {
+                    if (Browser.platform in meta.platforms) {
+                        const fileIndex = meta.platforms[Browser.platform];
+                        fileInfo = meta.files[fileIndex];
+                    }
                 }
                 let capable = getCompressTextureRenderCapable(fileInfo.format);
                 if (capable && !LayaGL.renderEngine.getCapable(capable)) { // 当前环境是不支持 meta 中设置的压缩纹理格式
@@ -78,19 +87,20 @@ export class Texture2DLoader implements IResourceLoader {
                         const c = getCompressTextureRenderCapable(f.format);
                         return LayaGL.renderEngine.getCapable(c);
                     });
-                    fileInfo = fallback || RGBA;
+                    fileInfo = fallback || defaultRGBAFile;
                 }
 
                 //fallback到RGBA
                 if (fileInfo.file == null) {
                     const fallback = (meta.files as (typeof fileInfo)[]).find(f => f.ext === ext);
-                    fileInfo = fallback || RGBA;
+                    fileInfo = fallback || defaultRGBAFile;
                 }
             }
 
             if (fileInfo.file) {
                 url = AssetDb.inst.getSubAssetURL(url, task.uuid, fileInfo.file, fileInfo.ext);
                 ext = fileInfo.ext;
+                compressExt = `@${fileInfo.file}.${fileInfo.ext}`;
             }
 
             constructParams = [0, 0, fileInfo.format, meta.mipmap, meta.readWrite, meta.sRGB];
@@ -110,7 +120,7 @@ export class Texture2DLoader implements IResourceLoader {
 
         let compress = compressedFormats.indexOf(ext) != -1 ? ext : null;
         if (compress != null) {
-            return task.loader.fetch(url, "arraybuffer", task.progress.createCallback(), task.options).then(data => {
+            return task.loader.fetch(url, "arraybuffer", task.progress.createCallback(), task.options, task, compressExt).then(data => {
                 if (!data)
                     return null;
 
@@ -187,7 +197,7 @@ export class Texture2DLoader implements IResourceLoader {
             if (options.useWorkerLoader && premultiplyAlpha === "none")
                 options = Object.assign({ workerLoaderOptions: { premultiplyAlpha } }, options);
 
-            return task.loader.fetch(url, "image", task.progress.createCallback(), options).then(img => {
+            return task.loader.fetch(url, "image", task.progress.createCallback(), options, task).then(img => {
                 if (LayaGL.textureContext.needBitmap) {
                     if (img instanceof ImageBitmap)
                         return img;
@@ -299,7 +309,11 @@ export class TextureLoader implements IResourceLoader {
     }
 
     load(task: ILoadTask) {
-        let tex2D = <Texture2D>task.loader.getRes(task.url, Loader.TEXTURE2D);
+        let tex2D:Texture2D;
+        if (task.formattedUrl)//caochangli - 存在formattedUrl直接获取，减少一次URL.formatURL
+            tex2D = <Texture2D>Loader._getRes(task.formattedUrl, Loader.TEXTURE2D);
+        else
+            tex2D = <Texture2D>task.loader.getRes(task.url, Loader.TEXTURE2D);
         if (!tex2D || tex2D.obsolute) {
             let url: ILoadURL = { url: task.url, type: Loader.TEXTURE2D };
 
@@ -312,6 +326,8 @@ export class TextureLoader implements IResourceLoader {
                 url.constructParams = constructParams2d;
             else if (task.options.constructParams[5] == null)
                 url.constructParams = Object.assign([], constructParams2d, task.options.constructParams);
+            // caochangli - 带入formattedUrl，减少后续Load._load2方法中的URL.formatURL
+            url.formattedUrl = task.formattedUrl;
             return task.loader.load(url, task.options, task.progress.createCallback()).then(tex2D => {
                 return this.wrapTex2D(task, tex2D);
             });
