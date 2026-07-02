@@ -617,6 +617,7 @@ export class HierarchyParser {
         }
 
         let type: string;
+        let prefab: string;
         function checkData(data: any) {
             if (data._$uuid != null) {
                 // caochangli - 图片中散图转换成加载图集，如：GWidget.background中texture纹理
@@ -632,8 +633,15 @@ export class HierarchyParser {
                 return;
             }
 
-            if (data._$prefab != null)
-                data._$prefab = addInnerUrl(data._$prefab, Loader.HIERARCHY);
+            // if (data._$prefab != null)
+            //     data._$prefab = addInnerUrl(data._$prefab, Loader.HIERARCHY);
+            if ((prefab = data._$prefab) != null)
+                // caochangli - 预制体合并后，会出现PrefabImpl类不存在但对应的预制数据存在的情况
+                // 而上一次直接修改了预制数据中的_$prefab值(拼接上basePath)，本次又拼接basePath - 多次拼接导致路径出错
+                if (!basePath || !prefab.startsWith(basePath))
+                    data._$prefab = addInnerUrl(prefab, Loader.HIERARCHY);
+                else//已拼接过 - 按绝对路径处理
+                    addInnerUrl(prefab, Loader.HIERARCHY, true);
             else if ((type = data._$type) != null) {
                 if (type.endsWith(".bp"))
                     addInnerUrl(type, null, true);
