@@ -25,7 +25,7 @@ class SpineTempletLoader implements IResourceLoader {
         let atlasUrl = Utils.replaceFileExtension(task.url, "atlas");
 
         return Promise.all([
-            task.loader.fetch(task.url, task.ext == "skel" ? "arraybuffer" : "json", task.progress.createCallback()),
+            task.loader.fetch(task.url, task.ext == "skel" ? "arraybuffer" : "json", task.progress.createCallback(), null, task),
             task.loader.fetch(atlasUrl, "text", task.progress.createCallback())
         ]).then(res => {
             if (!res[0] || !res[1])

@@ -3,7 +3,7 @@ import { TextResource, TextResourceFormat } from "../resource/TextResource";
 
 class TextAssetLoader implements IResourceLoader {
     load(task: ILoadTask) {
-        return task.loader.fetch(task.url, "text", task.progress.createCallback(), task.options).then(data => {
+        return task.loader.fetch(task.url, "text", task.progress.createCallback(), task.options, task).then(data => {
             if (!data)
                 return null;
 
@@ -14,7 +14,7 @@ class TextAssetLoader implements IResourceLoader {
 
 class BytesAssetLoader implements IResourceLoader {
     load(task: ILoadTask) {
-        return task.loader.fetch(task.url, "arraybuffer", task.progress.createCallback(), task.options).then(data => {
+        return task.loader.fetch(task.url, "arraybuffer", task.progress.createCallback(), task.options, task).then(data => {
             if (!data)
                 return null;
 
@@ -25,7 +25,7 @@ class BytesAssetLoader implements IResourceLoader {
 
 class JsonAssetLoader implements IResourceLoader {
     load(task: ILoadTask) {
-        return task.loader.fetch(task.url, "json", task.progress.createCallback(), task.options).then(data => {
+        return task.loader.fetch(task.url, "json", task.progress.createCallback(), task.options, task).then(data => {
             if (!data)
                 return null;
 
@@ -36,7 +36,7 @@ class JsonAssetLoader implements IResourceLoader {
 
 class XMLAssetLoader implements IResourceLoader {
     load(task: ILoadTask) {
-        return task.loader.fetch(task.url, "xml", task.progress.createCallback(), task.options).then(data => {
+        return task.loader.fetch(task.url, "xml", task.progress.createCallback(), task.options, task).then(data => {
             if (!data)
                 return null;
 

@@ -235,7 +235,7 @@ export class Texture2DLoader implements IResourceLoader {
 
 export class RenderTextureLoader implements IResourceLoader {
     load(task: ILoadTask) {
-        return task.loader.fetch(task.url, "json", task.progress.createCallback(), task.options).then(data => {
+        return task.loader.fetch(task.url, "json", task.progress.createCallback(), task.options, task).then(data => {
             if (!data)
                 return null;
 

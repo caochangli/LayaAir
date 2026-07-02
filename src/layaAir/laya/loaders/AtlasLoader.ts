@@ -5,7 +5,7 @@ import { Utils } from "../utils/Utils";
 
 class AtlasLoader implements IResourceLoader {
     load(task: ILoadTask) {
-        return task.loader.fetch(task.url, "json", task.progress.createCallback(0.2), task.options).then(data => {
+        return task.loader.fetch(task.url, "json", task.progress.createCallback(0.2), task.options, task).then(data => {
             if (!data)
                 return null;
 

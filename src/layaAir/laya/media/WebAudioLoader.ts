@@ -9,7 +9,7 @@ import { PAL } from "../platform/PlatformAdapters";
 class WebAudioLoader implements IResourceLoader {
 
     load(task: ILoadTask) {
-        return task.loader.fetch(task.url, "arraybuffer", task.progress.createCallback(), task.options).then(data => {
+        return task.loader.fetch(task.url, "arraybuffer", task.progress.createCallback(), task.options, task).then(data => {
             if (!data)
                 return null;
 

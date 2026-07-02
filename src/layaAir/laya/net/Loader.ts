@@ -741,7 +741,7 @@ export class Loader extends EventDispatcher {
      * @param contentType The expected content type of the resource.
      * @param onProgress Optional callback for progress updates.
      * @param options Optional loading options.
-     * @param loaderTask 可选的下载任务对象
+     * @param loaderTask 可选的下载任务对象 - 用于减少URL.formatURL执行次数
      * @param compressExt 可选的压缩纹理后缀，如：@1.ktx
     * @returns A promise that resolves with the downloaded content. If the download fails, the promise resolves with null.
      * @zh 从指定URL下载。这是较为底层的下载资源的方法，它和load方法不同，不对返回的数据进行解析，也不会缓存下载的内容。成功则返回下载的数据，失败返回null。
@@ -749,7 +749,7 @@ export class Loader extends EventDispatcher {
      * @param contentType 预期的资源内容类型。
      * @param onProgress 可选的进度更新回调。
      * @param options 可选的加载选项。
-     * @param loaderTask 可选的下载任务对象
+     * @param loaderTask 可选的下载任务对象 - 用于减少URL.formatURL执行次数
      * @param compressExt 可选的压缩纹理后缀，如：@1.ktx
      * @returns 解析为下载内容的Promise，加载失败则返回null
      */
@@ -790,20 +790,44 @@ export class Loader extends EventDispatcher {
                     //    loaderTask.url：           res/***/Base.png                      - 不带版本号的原文件后缀路径
                     //    loaderTask.formattedUrl：  https://***/res/***/Base-7608f.png    - 带版本号的原原文件后缀路径
                     //    result：                   https://***/res/***/Base@1-7608f.ktx  - 带版本号的压缩纹理后缀路径
-                    if (!loaderTask)
+
+                    //未传入loaderTask - 延用原逻辑
+                    if (!loaderTask) {
                         task.url = URL.formatURL(url2);
+
+                        // 开发环境下做警告提示
+                        if (LayaEnv.isPreview)
+                            console.warn("fetch方法未传入loaderTask",url2);
+                    }
+                    //传入的是UUID - 延用原逻辑
                     else if (url != url2) {
-                        if (compressExt) {//压缩纹理 - 传入原文件后缀路径获取版本号
+                        //压缩纹理 - 传入原文件后缀路径获取版本号
+                        if (compressExt) {
                             let orgExtUrl = url2.replace(compressExt, "."+loaderTask.ext);
                             task.url = URL.formatURL(url2,null,orgExtUrl);
+                            // console.log("压缩纹理",task.url);
                         }
                         else
                             task.url = URL.formatURL(url2);
                     }
-                    else if (compressExt)//压缩纹理 - 传入原文件后缀路径获取版本号
+                    //压缩纹理 - 传入原文件后缀路径获取版本号
+                    else if (compressExt) {
                         task.url = URL.formatURL(url2,null,loaderTask.url);
+                        // console.log("压缩纹理",task.url);
+                    }
+                    //保护 - loaderTask.url与加载的url一致，才使用loaderTask.formattedUrl
+                    else if (loaderTask.formattedUrl && loaderTask.url == url) {
+                        task.url = loaderTask.formattedUrl;
+
+                        // 开发环境下做正确性验证
+                        if (LayaEnv.isPreview) {
+                            var formatURL = URL.formatURL(url2);
+                            if (formatURL != loaderTask.formattedUrl) 
+                                console.error("fetch方法formattedUrl错误",task.url + " -> " + formatURL);
+                        }
+                    }
                     else
-                        task.url = loaderTask.formattedUrl || URL.formatURL(url2);
+                        task.url = URL.formatURL(url2);
 
                     task.onComplete = resolve;
                     this.queueToDownload(task);
