@@ -69,6 +69,12 @@ export class ObjDecoder {
             for (let i = 0; i < data.length; i++) {
                 let v = data[i];
                 if (v != null) {
+                    // caochangli优化-提前预判不必要的_decode递归
+                    if (typeof v !== "object") {
+                        arr[i] = v; 
+                        continue;
+                    }
+                    // caochangli优化-提前预判不必要的_decode递归
                     try {
                         arr[i] = this._decode(v);
                     }
@@ -153,17 +159,37 @@ export class ObjDecoder {
             }
 
             for (let key in data) {
-                if (key.startsWith("_$") || excludeKeys && excludeKeys.has(key))
+                // if (key.startsWith("_$") || excludeKeys && excludeKeys.has(key))
+                //     continue;
+
+                // caochangli优化-替代startsWith("_$")
+                if (key.charCodeAt(0) === 95 && key.charCodeAt(1) === 36)
+                    continue;
+                if (excludeKeys && excludeKeys.has(key))
                     continue;
 
                 let v = data[key];
-                if (v == null || typeof (v) !== "object" || Array.isArray(v)
-                    || v._$type || v._$uuid || v._$ref) {
+
+                // caochangli优化-提前预判不必要的_decode递归
+                if (v == null) {
+                    obj[key] = null;
+                    continue;
+                }
+                if (typeof v !== "object") {
+                    obj[key] = v;
+                    continue;
+                }
+                // caochangli优化-提前预判不必要的_decode递归
+                
+                // if (v == null || typeof (v) !== "object" || Array.isArray(v)
+                //     || v._$type || v._$uuid || v._$ref) {
+                if (Array.isArray(v) || v._$type || v._$uuid || v._$ref) {//caochangli
                     try {
                         let v2 = this._decode(v);
                         obj[key] = v2;
 
-                        if (v2 != null && v != null && v._$tmpl)
+                        // if (v2 != null && v != null && v._$tmpl)
+                        if (v2 != null && v._$tmpl)//caochangli
                             obj[v._$tmpl] = new PrefabImpl(null, this.getNodeData(v2));
                     }
                     catch (error: any) {

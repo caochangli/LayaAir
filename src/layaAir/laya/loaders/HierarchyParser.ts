@@ -153,14 +153,27 @@ export class HierarchyParser {
                         // caochangli - overrideData2被递归使用的，如果有问题，改回不使用对象池
                         let overrideData2: Array<any> = HierarchyParser.getArray();//[];
                         let testId = nodeData._$id;
+                        let recycleSubArrays: Array<any> = null;
                         if (overrideData) {
                             for (let i = 0, n = overrideData.length; i < n; i++) {
                                 let arr = overrideData[i];
                                 if (arr && arr.length > 0) {
-                                    overrideData2[i] = arr.filter(d => {
+                                    // overrideData2[i] = arr.filter(d => {
+                                    //     let od = d._$override || d._$parent;
+                                    //     return Array.isArray(od) && od.length > n - i && od[n - i - 1] == testId;
+                                    // });
+                                    // caochangli优化-避免filter闭包，手动循环+对象池
+                                    let filtered: Array<any> = HierarchyParser.getArray();
+                                    for (let arrIndex = 0, arrLength = arr.length; arrIndex < arrLength; arrIndex++) {
+                                        let d = arr[arrIndex];
                                         let od = d._$override || d._$parent;
-                                        return Array.isArray(od) && od.length > n - i && od[n - i - 1] == testId;
-                                    });
+                                        if (Array.isArray(od) && od.length > n - i && od[n - i - 1] == testId)
+                                            filtered.push(d);
+                                    }
+                                    overrideData2[i] = filtered;
+                                    if (!recycleSubArrays)
+                                        recycleSubArrays = HierarchyParser.getArray();
+                                    recycleSubArrays.push(filtered);
                                 }
                                 else
                                     overrideData2[i] = arr;
@@ -170,6 +183,13 @@ export class HierarchyParser {
                         overrideData2.push(nodeData._$child);
 
                         node = res.create({ inPrefab: true, prefabNodeDict: prefabNodeDict, overrideData: overrideData2 }, errors);
+
+                        // caochangli - 回收本层过滤产生的子数组（外层overrideData2已被递归parse回收）
+                        if (recycleSubArrays) {
+                            for (let i = 0, n = recycleSubArrays.length; i < n; i++)
+                                HierarchyParser.recycleArray(recycleSubArrays[i]);
+                            HierarchyParser.recycleArray(recycleSubArrays);
+                        }
                     }
                 }
                 else if (pstr = nodeData._$type) {
@@ -616,29 +636,35 @@ export class HierarchyParser {
             return url;
         }
 
-        let type: string;
+        let uuid: string;
         let prefab: string;
+        let type: string;
         function checkData(data: any) {
-            if (data._$uuid != null) {
-                // caochangli - 图片中散图转换成加载图集，如：GWidget.background中texture纹理
-                if (data._$type == "Texture")
-                {
-                    if (Utils.isUUID(data._$uuid))
-                        data._$uuid = "res://" + data._$uuid;
-                    addInnerTexture(data._$uuid);
+            // if (data._$uuid != null) {
+            //     data._$uuid = addInnerUrl(data._$uuid, Loader.assetTypeToLoadType[data._$type]);
+            //     return;
+            // }
+            // caochangli - 合并预制体数据后，会出现多次相对路径拼接情况，这里做个保护
+            if ((uuid = data._$uuid) != null) {
+                if (data._$type == "Texture") {
+                    if (checkRelativePath(uuid))
+                        data._$uuid = addInnerTexture(uuid);
+                    else
+                        addInnerTexture(uuid,true);
+                } else {
+                    if (checkRelativePath(uuid))
+                        data._$uuid = addInnerUrl(uuid,Loader.assetTypeToLoadType[data._$type]);
+                    else
+                        addInnerUrl(uuid,Loader.assetTypeToLoadType[data._$type],true);
                 }
-                // caochangli - 图片中散图转换成加载图集，如：GWidget.background中texture纹理
-                else
-                    data._$uuid = addInnerUrl(data._$uuid, Loader.assetTypeToLoadType[data._$type]);
                 return;
             }
 
             // if (data._$prefab != null)
             //     data._$prefab = addInnerUrl(data._$prefab, Loader.HIERARCHY);
+            // caochangli - 合并预制体数据后，会出现多次相对路径拼接情况，这里做个保护
             if ((prefab = data._$prefab) != null)
-                // caochangli - 预制体合并后，会出现PrefabImpl类不存在但对应的预制数据存在的情况
-                // 而上一次直接修改了预制数据中的_$prefab值(拼接上basePath)，本次又拼接basePath - 多次拼接导致路径出错
-                if (!basePath || !prefab.startsWith(basePath))
+                if (checkRelativePath(prefab))
                     data._$prefab = addInnerUrl(prefab, Loader.HIERARCHY);
                 else//已拼接过 - 按绝对路径处理
                     addInnerUrl(prefab, Loader.HIERARCHY, true);
@@ -717,37 +743,33 @@ export class HierarchyParser {
         }
 
         function supplementInner(type:string,data:any) {
-            if (type == "Sprite") {
-                if (data.texture)
-                    addInnerTexture(data.texture._$uuid);
-            }
-            else if (type == "GImage") {
-                addInnerTexture(data.src);
+            if (type == "GImage") {
+                addInnerTexture(data.src,true);
             }
             else if (type == "Spine2DRenderNode" || type == "SSpine2DRenderNode") {
                 if (data.source) {
-                    addInnerUrl(data.source, Loader.SPINE, true);
+                    addInnerUrl(data.source,Loader.SPINE,true);
                 }
             }
             else if (type == "SButton") {
-                addInnerTexture(data.upSkin);
-                addInnerTexture(data.overSkin);
-                addInnerTexture(data.downSkin);
-                addInnerTexture(data.disableSkin);
-                addInnerTexture(data.selectedSkin);
-                addInnerTexture(data.selectedOverSkin);
-                addInnerTexture(data.selectedDownSkin);
-                addInnerTexture(data.selectedDisableSkin);
+                addInnerTexture(data.upSkin,true);
+                addInnerTexture(data.overSkin,true);
+                addInnerTexture(data.downSkin,true);
+                addInnerTexture(data.disableSkin,true);
+                addInnerTexture(data.selectedSkin,true);
+                addInnerTexture(data.selectedOverSkin,true);
+                addInnerTexture(data.selectedDownSkin,true);
+                addInnerTexture(data.selectedDisableSkin,true);
             }
             else if (type == "SComboBox") {
-                addInnerTexture(data.upSkin);
-                addInnerTexture(data.overSkin);
-                addInnerTexture(data.downSkin);
-                addInnerTexture(data.disableSkin);
-                addInnerTexture(data.arrowUpSkin);
-                addInnerTexture(data.arrowOverSkin);
-                addInnerTexture(data.arrowDownSkin);
-                addInnerTexture(data.arrowDisableSkin);
+                addInnerTexture(data.upSkin,true);
+                addInnerTexture(data.overSkin,true);
+                addInnerTexture(data.downSkin,true);
+                addInnerTexture(data.disableSkin,true);
+                addInnerTexture(data.arrowUpSkin,true);
+                addInnerTexture(data.arrowOverSkin,true);
+                addInnerTexture(data.arrowDownSkin,true);
+                addInnerTexture(data.arrowDisableSkin,true);
             }
             else if (type == "GMovieClip") {
                 if (data.src)// 图集本身
@@ -763,27 +785,58 @@ export class HierarchyParser {
                 }
             }
         }
-        function addInnerTexture(url:string) {
+        function addInnerTexture(url:string,absolutePath?:boolean):string {
             if (!url) return "";
             //预览环境
             if (LayaEnv.isPreview) {
-                let index = url.startsWith("res://") ? url.indexOf("@") : -1;
-                if (index != -1)//引用图集散图 - 改为加载图集
-                    // res://55fd0692-d625-4fe3-b7c9-f27b5de4982b@age_waring_tip
-                    return addInnerUrl(url.substring(0,index), Loader.ATLAS, true);
+                // res://55fd0692-d625-4fe3-b7c9-f27b5de4982b@age_waring_tip
+                let index = Utils.isUUID(url) || url.startsWith("res://") ? url.indexOf("@") : -1;
+                if (index != -1) {
+                    // 加载对应的图集
+                    let innerUrl = addInnerUrl(url.substring(0,index), Loader.ATLAS, absolutePath);
+                    // 返回原散图拼接后的路径
+                    return innerUrl + url.substring(index,url.length);
+                } 
                 else
-                    return addInnerUrl(url, Loader.IMAGE, true);
+                    return addInnerUrl(url, Loader.IMAGE, absolutePath);
             }
             //生产环境 
             else {
-                let index = url.indexOf("res/atlas/");//根据目录结构判断是否是图集 - 有点狗
-                if (index != -1) {//引用图集散图 - 改为加载图集
-                    // res/atlas/base/cmn_text_btn_gray_259_78.png
-                    return addInnerUrl(`${url.substring(0,url.lastIndexOf("/"))}.atlas`, Loader.ATLAS, true);
+                // 相对路径 - 转成绝对路径处理
+                if (!absolutePath) 
+                    url = URL.join(basePath, url);
+           
+                // res/atlas/base/cmn_text_btn_gray_259_78.png
+                let index = url.indexOf("res/atlas/");//比较抽象，目前只能按是 "res/atlas/" 目录中的来判断是否是图集
+                if (index != -1) {
+                    // 加载对应的图集
+                    addInnerUrl(url.substring(0,url.lastIndexOf("/")) + ".atlas", Loader.ATLAS, true);
+                    // 返回原散图拼接后的路径
+                    return url;
                 } 
                 else
                     return addInnerUrl(url, Loader.IMAGE, true);
             }
+        }
+
+        /**判断是否相对路径 - 比较抽象，目前只能按url是 "res/" 开头来判断*/
+        function checkRelativePath(url:string):boolean {
+            if (url.length <= 4) return true;
+
+            let c0 = url.charCodeAt(0);
+
+            // 以 "./" 或 "../" 开头 - 相对路径
+            if (c0 === 46) { // '.'
+                let c1 = url.charCodeAt(1);
+                if (c1 === 47) return true; // "./"
+                if (c1 === 46 && url.charCodeAt(2) === 47) return true; // "../"
+            }
+
+            // 以 "res/" 开头 - 绝对路径 
+            if (c0 === 114 && url.charCodeAt(1) === 101 && url.charCodeAt(2) === 115 && url.charCodeAt(3) === 47)
+                return false;
+            
+            return LayaEnv.isPreview ? Utils.isUUID(url) : true;
         }
         // caochangli - 补充资源依赖处理
 

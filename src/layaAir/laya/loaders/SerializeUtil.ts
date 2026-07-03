@@ -42,7 +42,10 @@ export class SerializeUtil {
         for (let n = overrideData.length, i = n - 1; i >= 0; i--) {
             let arr = overrideData[i];
             if (arr && arr.length > 0) {
-                for (let d of arr) {
+                // for (let d of arr) {
+                // caochangli - for of 改成 for
+                for (let arrIndex = 0,arrLength = arr.length; arrIndex < arrLength; arrIndex++) {
+                    let d = arr[i];
                     let od = d._$override || d._$parent;
                     let k: string;
                     if (Array.isArray(od))
@@ -202,7 +205,8 @@ export class SerializeUtil {
 
 function mergeData(target: any, overrided: any) {
     for (let k in overrided) {
-        if (k.startsWith("_$"))
+        // if (k.startsWith("_$"))
+        if (k.charCodeAt(0) === 95 && k.charCodeAt(1) === 36)
             continue;
 
         let v = overrided[k];
