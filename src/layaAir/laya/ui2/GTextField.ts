@@ -52,7 +52,7 @@ export class GTextField extends GWidget {
      * @en Represents the text content string.
      * @zh 表示文本内容字符串。
      */
-    protected _text: string;
+    protected _text: string = "";
 
     /**
      * @en Represents the text overflow property.

@@ -84,7 +84,7 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
     static readonly PLAYING: number = 2;
 
     protected _renderHandle: ISpineRenderDataHandle;
-    protected _source: string;
+    protected _source: string = "";
     protected _templet: SpineTemplet;
     protected _timeKeeper: TimeKeeper;
     protected _skeleton: spine.Skeleton;
@@ -107,7 +107,7 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
     private trackIndex: number = 0;
 
     private _skinName: string = "default";
-    protected _animationName: string;
+    protected _animationName: string = "";
     protected _loop: boolean = true;
 
     private _externalSkins: ExternalSkin[];
@@ -212,6 +212,7 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
     }
 
     set source(value: string) {
+        if (value == null) value = "";
         this._source = value;
 
         if (value) {
@@ -255,6 +256,7 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
     }
 
     set animationName(value: string) {
+        if (value == null) value = "";
         this._animationName = value;
         // caochangli - 序列化时预制中设置的值 和 onEnable 重复执行play，换到SSpine2DRenderNode.onAfterDeserialize中实现序列化完成自动播放功能
         // if (this._templet && this._animationName)

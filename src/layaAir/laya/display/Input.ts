@@ -109,7 +109,7 @@ export class Input extends Text {
      * @en The restriction on input characters.
      * @zh 对输入字符的限制。
      */
-    restrict: string;
+    restrict: string = "";
 
     protected _multiline: boolean = false;
     protected _editable: boolean = true;
