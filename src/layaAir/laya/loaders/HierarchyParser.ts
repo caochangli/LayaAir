@@ -627,7 +627,11 @@ export class HierarchyParser {
             let entry = test[url];
             if (entry === undefined) {
                 innerUrls.push({ url, type });
-                test[url] = [type];
+                // test[url] = [type];
+                // caochangli - 使用池化数组
+                let typeList = HierarchyParser.getArray();
+                typeList.push(type);
+                test[url] = typeList;
             }
             else if (entry.indexOf(type) === -1) {
                 innerUrls.push({ url, type });
@@ -852,6 +856,13 @@ export class HierarchyParser {
                     addInnerUrl(url, null, true);
                 pi++;
             }
+        }
+
+        // caochangli - 回收池化数组
+        for (let key in test)
+        {
+            let typeList = test[key];
+            HierarchyParser.recycleArray(typeList);
         }
 
         return innerUrls;

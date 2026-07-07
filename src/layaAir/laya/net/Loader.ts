@@ -971,17 +971,34 @@ export class Loader extends EventDispatcher {
 
             typeId = typeEntry.typeId;
 
-            let i: number = 0;
+            // let i: number = 0;
             if (extEntry) {
-                if (extEntry[0].typeId === typeId //优化，大部分情况均为如此
-                    || (i = extEntry.findIndex(e => e.typeId === typeId)) != -1) {
-                    main = i === 0;
-                    loaderType = extEntry[i].loaderType;
+                // if (extEntry[0].typeId === typeId //优化，大部分情况均为如此
+                //     || (i = extEntry.findIndex(e => e.typeId === typeId)) != -1) {
+                //     main = i === 0;
+                //     loaderType = extEntry[i].loaderType;
+                // }
+                // else {
+                // caochangli - findIndex换成for
+                if (extEntry[0].typeId === typeId) { //优化，大部分情况均为如此
+                    main = true;
+                    loaderType = extEntry[0].loaderType;
                 }
                 else {
+                    let found = false;
+                    for (let i:number = 1; i < extEntry.length; i++) {
+                        if (extEntry[i].typeId === typeId) {
+                            main = false;
+                            loaderType = extEntry[i].loaderType;
+                            found = true;
+                            break;
+                        }
+                    }
                     //未与扩展名匹配的情况，例如a.lh试图以Loader.JSON类型加载，这种组合没有注册，但仍然允许加载为副资源
-                    main = false;
-                    loaderType = typeEntry.loaderType;
+                    if (!found) {
+                        main = false;
+                        loaderType = typeEntry.loaderType;
+                    }
                 }
             }
             else { //扩展名没有注册的情况
