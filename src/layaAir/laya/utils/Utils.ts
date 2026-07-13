@@ -187,7 +187,7 @@ export class Utils {
         if (ext === "ls") {
             let k = path.lastIndexOf(".", i - 1);
             if (k !== -1) {
-                let ext2 = path.substring(k + 1, i + 1) + ext;
+                let ext2 = path.substring(k + 1, i + 1).toLowerCase() + ext;
                 if (ext2 === "lanit.ls" || ext2 === "ltcb.ls")
                     return ext2;
             }
