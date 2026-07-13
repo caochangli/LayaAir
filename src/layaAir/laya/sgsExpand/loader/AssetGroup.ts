@@ -25,7 +25,7 @@ export interface IAssetGroup
      * @param onProgress 进度回调
      * @return 返回groupID - -1表示无效的groupID，不需要加载直接返回
      */
-    LoadGroup(urls:Array<string | {url:string,type?:string}> | Record<string,{type:string}>,caller?:any,
+    LoadGroup(urls:Array<string | {url:string,type?:string}>,caller?:any,
         onComplete?:(group:IAssetGroup,resList:Array<any>,args?:any)=>void,args?:any,onProgress?:(progress:number)=>void):number;
     
     /**

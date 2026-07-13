@@ -136,6 +136,8 @@ interface URLInfo {
     loaderType: new () => IResourceLoader,
 }
 const NullURLInfo: Readonly<URLInfo> = { ext: null, typeId: null, main: false, loaderType: null };
+/** @internal */
+const _tempURLInfo: URLInfo = { ext: null, typeId: null, main: false, loaderType: null };
 
 /**
  * @en The `Loader` class can be used to load resources such as text, JSON, XML, binary, images, etc.
@@ -1016,7 +1018,11 @@ export class Loader extends EventDispatcher {
             loaderType = extEntry[0].loaderType;
         }
 
-        return { ext, main, typeId, loaderType };
+        _tempURLInfo.ext = ext;
+        _tempURLInfo.main = main;
+        _tempURLInfo.typeId = typeId!;
+        _tempURLInfo.loaderType = loaderType;
+        return _tempURLInfo;
     }
 
     /**

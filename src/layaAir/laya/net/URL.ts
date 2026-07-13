@@ -1,4 +1,5 @@
 import { PlayerConfig } from "../../Config";
+import { ILaya } from "../../ILaya";
 import { LayaEnv } from "../../LayaEnv";
 import { AssetDb } from "../resource/AssetDb";
 import { Utils } from "../utils/Utils";
@@ -129,6 +130,15 @@ export class URL {
         if (!url)
             return base || URL.basePath || "";
 
+        // caochangli - formatURL缓存
+        let inputUrl:string = url;
+        let inputBase:string = base;
+        if (!inputBase) {
+            let formattedUrl = URL.getFormatURLCache(url);
+            if (formattedUrl) return formattedUrl;
+        }
+        // caochangli - formatURL缓存
+
         if (url.startsWith("res://")) {
             let uuid = url.substring(6);
             let url2 = AssetDb.inst.UUID_to_URL(uuid);
@@ -173,6 +183,12 @@ export class URL {
             }
             url = URL.join(base, url);
         }
+
+        // caochangli - formatURL缓存
+        if (!inputBase) {
+            URL.addFormatURLCache(inputUrl,url);
+        }
+        // caochangli - formatURL缓存
 
         return url;
     }
@@ -338,4 +354,83 @@ export class URL {
             URL.overrideFileExts[ext] = targetExt;
         URL.hasExtOverrides = true;
     }
+
+
+//#region caochangli - FormatURL缓存
+
+    /**formatURL缓存数量上限 */
+    public static formatURLCacheMaxSize:number = 500;
+    
+    /**formatURL缓存过期时间(毫秒) */
+    public static formatURLCacheExpireTime:number = 10*1000;
+    
+    private static _enableformatURLCache:boolean = true;
+    private static _formatURLCache:Record<string,{formatURL:string,time:number}> = {};
+    private static _formatURLCacheSize:number = 0;
+    
+    /**是否启动FormatURL缓存 */
+    public static set enableformatURLCache(value:boolean) {
+        this._enableformatURLCache = value;
+        if (!this._enableformatURLCache) {// 关闭缓存
+            this._formatURLCache = {};
+            this._formatURLCacheSize = 0;
+        }
+    }
+    public static get enableformatURLCache():boolean {
+        return this._enableformatURLCache;
+    }
+
+    /**获取FormatURL缓存 */
+    private static getFormatURLCache(url:string):string
+    {
+        if (!this._enableformatURLCache) 
+            return null;
+        let cache = this._formatURLCache[url];
+        if (cache)
+        {
+            cache.time = ILaya.timer.currTimer;
+            return cache.formatURL;
+        }
+        return null;
+    }
+    
+    /**添加FormatURL缓存 */
+    private static addFormatURLCache(url:string,formatURL:string):void
+    {
+        if (!this._enableformatURLCache)
+            return;
+        
+        let time = ILaya.timer.currTimer;
+        let maxSize = this.formatURLCacheMaxSize;
+
+        // 超过最大容量时删除缓存
+        if (this._formatURLCacheSize >= maxSize)
+        {
+            let oldestKey = null;
+            let oldestTime = Number.MAX_VALUE;
+            let expireTime = this.formatURLCacheExpireTime;
+            for (let key in this._formatURLCache)
+            {
+                let cache = this._formatURLCache[key];
+                // 删除过期缓存
+                if (time - cache.time > expireTime) {
+                    delete this._formatURLCache[key];
+                    this._formatURLCacheSize --;
+                }
+                // 在未过期里记录最老的一个
+                else if (cache.time < oldestTime) {
+                    oldestTime = cache.time;
+                    oldestKey = key;
+                }
+            }
+            // 还满就删最老的那个
+            if (this._formatURLCacheSize >= maxSize && oldestKey) {
+                delete this._formatURLCache[oldestKey];
+                this._formatURLCacheSize--;
+            }
+        }
+        this._formatURLCache[url] = {formatURL:formatURL,time:time};
+        this._formatURLCacheSize ++;
+    }
+//#endregion caochangli - FormatURL缓存
 }

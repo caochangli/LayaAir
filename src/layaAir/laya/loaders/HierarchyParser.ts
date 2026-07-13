@@ -612,6 +612,8 @@ export class HierarchyParser {
     public static collectResourceLinks(data: any, basePath: string) {
         let test: Record<string, string[]> = {};
         let innerUrls: ILoadURL[] = [];
+        /** 散图目录 → 图集url */
+        let atlasCacheDir:Record<string, string> = {};
 
         function addInnerUrl(url: string, type: string, absolutePath?: boolean) {
             if (!url)
@@ -796,10 +798,21 @@ export class HierarchyParser {
                 // res://55fd0692-d625-4fe3-b7c9-f27b5de4982b@age_waring_tip
                 let index = Utils.isUUID(url) || url.startsWith("res://") ? url.indexOf("@") : -1;
                 if (index != -1) {
-                    // 加载对应的图集
-                    let innerUrl = addInnerUrl(url.substring(0,index), Loader.ATLAS, absolutePath);
+                    // // 加载对应的图集
+                    // let innerUrl = addInnerUrl(url.substring(0,index), Loader.ATLAS, absolutePath);
+                    // // 返回原散图拼接后的路径
+                    // return innerUrl + url.substring(index);
+                    
+                    // 采用临时缓存
+                    let atlasKey = url.substring(0,index);
+                    let innerUrl = atlasCacheDir[atlasKey];
+                    if (!innerUrl) {
+                        // 加载对应的图集
+                        innerUrl = addInnerUrl(atlasKey, Loader.ATLAS, absolutePath);
+                        atlasCacheDir[atlasKey] = innerUrl;
+                    }
                     // 返回原散图拼接后的路径
-                    return innerUrl + url.substring(index,url.length);
+                    return innerUrl + url.substring(index);
                 } 
                 else
                     return addInnerUrl(url, Loader.IMAGE, absolutePath);
@@ -813,8 +826,20 @@ export class HierarchyParser {
                 // res/atlas/base/cmn_text_btn_gray_259_78.png
                 let index = url.indexOf("res/atlas/");//比较抽象，目前只能按是 "res/atlas/" 目录中的来判断是否是图集
                 if (index != -1) {
-                    // 加载对应的图集
-                    addInnerUrl(url.substring(0,url.lastIndexOf("/")) + ".atlas", Loader.ATLAS, true);
+                    // // 加载对应的图集
+                    // addInnerUrl(url.substring(0,url.lastIndexOf("/")) + ".atlas", Loader.ATLAS, true);
+                    // // 返回原散图拼接后的路径
+                    // return url;
+                    
+                    // 采用临时缓存
+                    let atlasDir = url.substring(0,url.lastIndexOf("/"));
+                    let atlasUrl = atlasCacheDir[atlasDir];
+                    if (!atlasUrl) {
+                        atlasUrl = atlasDir + ".atlas";
+                        atlasCacheDir[atlasDir] = atlasUrl;
+                        // 加载对应的图集
+                        addInnerUrl(atlasUrl, Loader.ATLAS, true);
+                    }
                     // 返回原散图拼接后的路径
                     return url;
                 } 
