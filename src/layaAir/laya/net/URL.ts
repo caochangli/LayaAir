@@ -2,6 +2,7 @@ import { PlayerConfig } from "../../Config";
 import { ILaya } from "../../ILaya";
 import { LayaEnv } from "../../LayaEnv";
 import { AssetDb } from "../resource/AssetDb";
+import { ArrayPool } from "../sgsExpand/pool/ArrayPool";
 import { Utils } from "../utils/Utils";
 
 /**
@@ -134,8 +135,12 @@ export class URL {
         let inputUrl:string = url;
         let inputBase:string = base;
         if (!inputBase) {
-            let formattedUrl = URL.getFormatURLCache(url);
-            if (formattedUrl) return formattedUrl;
+            let formattedUrl = URL.getAtlasFrameURLCache(url);
+            if (formattedUrl) 
+                return formattedUrl;
+            formattedUrl = URL.getFormatURLCache(url);
+            if (formattedUrl)
+                return formattedUrl;
         }
         // caochangli - formatURL缓存
 
@@ -360,30 +365,32 @@ export class URL {
 
     /**formatURL缓存数量上限 */
     public static formatURLCacheMaxSize:number = 500;
-    
     /**formatURL缓存过期时间(毫秒) */
     public static formatURLCacheExpireTime:number = 10*1000;
     
-    private static _enableformatURLCache:boolean = true;
+    private static _enableFormatURLCache:boolean = true;
     private static _formatURLCache:Record<string,{formatURL:string,time:number}> = {};
     private static _formatURLCacheSize:number = 0;
     
     /**是否启动FormatURL缓存 */
-    public static set enableformatURLCache(value:boolean) {
-        this._enableformatURLCache = value;
-        if (!this._enableformatURLCache) {// 关闭缓存
+    public static set enableFormatURLCache(value:boolean) {
+        this._enableFormatURLCache = value;
+        if (!this._enableFormatURLCache) {// 关闭缓存
             this._formatURLCache = {};
             this._formatURLCacheSize = 0;
         }
     }
-    public static get enableformatURLCache():boolean {
-        return this._enableformatURLCache;
+    public static get enableFormatURLCache():boolean { return this._enableFormatURLCache; }
+
+    /**清理FormatURL缓存 */
+    public static clearFormatURLCache():void {
+        this._formatURLCache = {};
+        this._formatURLCacheSize = 0;
     }
 
     /**获取FormatURL缓存 */
-    private static getFormatURLCache(url:string):string
-    {
-        if (!this._enableformatURLCache) 
+    private static getFormatURLCache(url:string):string {
+        if (!this._enableFormatURLCache) 
             return null;
         let cache = this._formatURLCache[url];
         if (cache)
@@ -395,42 +402,74 @@ export class URL {
     }
     
     /**添加FormatURL缓存 */
-    private static addFormatURLCache(url:string,formatURL:string):void
-    {
-        if (!this._enableformatURLCache)
+    private static addFormatURLCache(url:string,formatURL:string):void {
+        if (!this._enableFormatURLCache)
             return;
         
         let time = ILaya.timer.currTimer;
         let maxSize = this.formatURLCacheMaxSize;
 
         // 超过最大容量时删除缓存
-        if (this._formatURLCacheSize >= maxSize)
-        {
+        if (this._formatURLCacheSize >= maxSize) {
+            let delKeys = ArrayPool.Get();
             let oldestKey = null;
             let oldestTime = Number.MAX_VALUE;
             let expireTime = this.formatURLCacheExpireTime;
-            for (let key in this._formatURLCache)
-            {
+            for (let key in this._formatURLCache) {
                 let cache = this._formatURLCache[key];
-                // 删除过期缓存
-                if (time - cache.time > expireTime) {
-                    delete this._formatURLCache[key];
-                    this._formatURLCacheSize --;
-                }
+                // 过期缓存
+                if (time - cache.time > expireTime)
+                    delKeys.push(key);
                 // 在未过期里记录最老的一个
                 else if (cache.time < oldestTime) {
                     oldestTime = cache.time;
                     oldestKey = key;
                 }
             }
-            // 还满就删最老的那个
-            if (this._formatURLCacheSize >= maxSize && oldestKey) {
-                delete this._formatURLCache[oldestKey];
-                this._formatURLCacheSize--;
+
+            // 删除过期缓存
+            if (delKeys.length > 0) {
+                for (let i = 0,len = delKeys.length; i < len; i++) {
+                    delete this._formatURLCache[delKeys[i]];
+                    this._formatURLCacheSize --;
+                }
             }
+            // 还满就删最老的那个
+            else if (this._formatURLCacheSize >= maxSize && oldestKey) {
+                delete this._formatURLCache[oldestKey];
+                this._formatURLCacheSize --;
+            }
+
+            ArrayPool.Release(delKeys);
         }
+
+        // 保存新缓存
         this._formatURLCache[url] = {formatURL:formatURL,time:time};
         this._formatURLCacheSize ++;
     }
 //#endregion caochangli - FormatURL缓存
+
+
+//#region caochangli - 已加载图集散图URL缓存
+
+    private static _atlasFrameURLCache:Record<string,string> = {};
+
+    /**获取已加载图集散图URL缓存 */
+    private static getAtlasFrameURLCache(url:string):string
+    {
+        return this._atlasFrameURLCache[url];
+    }
+
+    /**添加已加载图集散图URL缓存 */
+    public static addAtlasFrameURLCache(url:string,formatURL:string):void
+    {
+        this._atlasFrameURLCache[url] = formatURL;
+    }
+
+    /**删除已加载图集散图URL缓存 */
+    public static delAtlasFrameURLCache(url:string):void
+    {
+        delete this._atlasFrameURLCache[url];
+    }
+//#endregion caochangli - 已加载图集散图URL缓存
 }

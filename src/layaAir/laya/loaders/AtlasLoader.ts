@@ -2,6 +2,8 @@ import { IResourceLoader, ILoadTask, Loader } from "../net/Loader";
 import { AtlasResource } from "../resource/AtlasResource";
 import { Texture } from "../resource/Texture";
 import { Utils } from "../utils/Utils";
+import { URL } from "../net/URL";
+import { ArrayPool } from "../sgsExpand/pool/ArrayPool";
 
 class AtlasLoader implements IResourceLoader {
     load(task: ILoadTask) {
@@ -55,6 +57,7 @@ class AtlasLoader implements IResourceLoader {
                     urlInfo = {typeId:extEntry[0].typeId,main:true};
                     jumpFormatURL = true;
                 }
+                let frameURLs:Array<{url:string,formattedUrl:string}> = <AtlasResource>task.obsoluteInst ? ArrayPool.Get() : null;
 
                 let scaleRate: number = 1;
                 if (data.meta && data.meta.scale && data.meta.scale != 1)
@@ -76,10 +79,13 @@ class AtlasLoader implements IResourceLoader {
                     if (!jumpFormatURL)
                         task.loader.cacheRes(url, tt);
                     else if (urlInfo.typeId) {//caochangli - 跳过loader.cacheRes中URL.formatURL和Loader.getURLInfo
-                        if (atlasPrefix)
-                            Loader._cacheRes(atlasPrefix + url, tt, urlInfo.typeId, urlInfo.main);
+                        let formattedUrl = atlasPrefix ? atlasPrefix + url : url;
+                        Loader._cacheRes(formattedUrl, tt, urlInfo.typeId, urlInfo.main);
+                        //caochangli - 缓存图集散图url
+                        if (frameURLs)
+                            frameURLs.push({url:url,formattedUrl:formattedUrl});
                         else
-                            Loader._cacheRes(url, tt, urlInfo.typeId, urlInfo.main);
+                            URL.addAtlasFrameURLCache(url,formattedUrl);
                     }
                     tt.url = url;
                     subTextures.push(tt);
@@ -91,6 +97,14 @@ class AtlasLoader implements IResourceLoader {
                     res.dir = directory;
                     res.animation = data.animation;
                     res.event("reload");
+                    //caochangli - 缓存图集散图url
+                    if (frameURLs) {
+                        for (let i = 0,len = frameURLs.length; i < len; i++) {
+                            let frameURL = frameURLs[i];
+                            URL.addAtlasFrameURLCache(frameURL.url,frameURL.formattedUrl);
+                        }
+                        ArrayPool.Release(frameURLs);
+                    }
                     return res;
                 }
                 else {

@@ -1,7 +1,7 @@
 import { AnimationWrapMode } from "../components/FrameAnimation";
 import { Resource } from "./Resource";
 import { Texture } from "./Texture";
-
+import { URL } from "../net/URL";
 
 export interface IAtlasAnimationInfo {
     /**
@@ -118,8 +118,11 @@ export class AtlasResource extends Resource {
         }
 
         for (let tex of this.frames) {
+            let url = tex.url;
             tex._atlas = null;
             tex._removeReference();
+            if (url)//caochangli - 图集销毁时，清理缓存的图集散图url
+                URL.delAtlasFrameURLCache(url);
         }
 
         this.frames.length = 0;
