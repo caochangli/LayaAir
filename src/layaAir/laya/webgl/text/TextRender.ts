@@ -400,60 +400,50 @@ export class TextRender {
 //#region caochangli - 缓存文本宽度
     
     private static _enableTextWidthCache:boolean = true;
-    /**文本宽度缓存字典 */
-    private static _textWidthMap:Map<string,TextMetrics> = new Map();
-    /**文本宽度缓存顺序 - 最新使用的在后面 */
-    private static _textWidthOrder: string[] = [];
+    private static _textWidthCache:Record<string,Record<string,TextMetrics>> = {};
+    private static _textWidthCacheSize:number = 0;
+    private static _nullTextMetrics:any = {width:0};
+
     /**是否启动文本宽度缓存 */
     public static set enableTextWidthCache(value:boolean) {
         this._enableTextWidthCache = value;
-        if (!this._enableTextWidthCache)// 关闭缓存
-        {
-            this._textWidthMap.clear();
-            this._textWidthOrder.length = 0;
+        if (!this._enableTextWidthCache) {// 关闭缓存
+            this._textWidthCache = {};
+            this._textWidthCacheSize = 0;
         }
     }
-    public static get enableTextWidthCache():boolean {
-        return this._enableTextWidthCache;
-    }
+    public static get enableTextWidthCache():boolean { return this._enableTextWidthCache; }
     /**文本宽度缓存 - 最大上限 */
-    public static textWidthCacheMax = 5000;
-    /**文本宽度缓存 - 到达最大上限后删除多少个*/
-    public static textWidthCacheClear = 1000;
+    public static textWidthCacheMax = 3000;
     
     /**caochangli - 测量文本尺寸：利用缓存机制 */
     public static measureText(text:string,ctx?:CanvasRenderingContext2D):TextMetrics {
+        if (!text) 
+            return this._nullTextMetrics;
         let context = ctx || Browser.context;
-        if (!this._enableTextWidthCache)
+        // 未开启缓存或文本太长 - 不缓存
+        if (!this._enableTextWidthCache || text.length >= 200)
             return context.measureText(text);
-        let key = `${context.font}_${text}`;
-        let ret = this._textWidthMap.get(key);
-        if (ret === undefined) {
-            ret = context.measureText(text);
-            if (ret) {
-                this._textWidthMap.set(key,ret);
-                this._textWidthOrder.push(key);
-                // 缓存超过上限 - 清理一部分
-                if (this._textWidthMap.size > TextRender.textWidthCacheMax) {
-                    let clearCount = TextRender.textWidthCacheClear;
-                    for (let i = 0; i < clearCount; i++) {
-                        let oldKey = this._textWidthOrder[i];
-                        if (oldKey) this._textWidthMap.delete(oldKey);
-                    }
-                    this._textWidthOrder.splice(0, clearCount);
-                }
-            }
-        } else {
-            // 将新使用的key放到最后
-            let index = this._textWidthOrder.indexOf(key);
-            if (index >= 0) {
-                let lastIndex = this._textWidthOrder.length - 1;
-                if (index !== lastIndex) {
-                    this._textWidthOrder[index] = this._textWidthOrder[lastIndex];
-                    this._textWidthOrder[lastIndex] = key;
-                }
-            }
+
+        let fontDir = this._textWidthCache[context.font];
+        if (fontDir) {
+            let ret = fontDir[text];
+            if (ret)
+                return ret;
+        } 
+        else
+            this._textWidthCache[context.font] = fontDir = {};
+            
+        // 超过最大容量时删除缓存
+        if (this._textWidthCacheSize >= this.textWidthCacheMax) {
+            this._textWidthCache = {};
+            this._textWidthCacheSize = 0;
+            this._textWidthCache[context.font] = fontDir = {};
         }
+
+        let ret = context.measureText(text);
+        fontDir[text] = ret;
+        this._textWidthCacheSize ++;
         return ret;
     }
 //#endregion caochangli - 缓存文本宽度

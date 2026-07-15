@@ -364,7 +364,7 @@ export class URL {
 //#region caochangli - FormatURL缓存
 
     /**formatURL缓存数量上限 */
-    public static formatURLCacheMaxSize:number = 500;
+    public static formatURLCacheMax:number = 500;
     /**formatURL缓存过期时间(毫秒) */
     public static formatURLCacheExpireTime:number = 10*1000;
     
@@ -407,7 +407,7 @@ export class URL {
             return;
         
         let time = ILaya.timer.currTimer;
-        let maxSize = this.formatURLCacheMaxSize;
+        let maxSize = this.formatURLCacheMax;
 
         // 超过最大容量时删除缓存
         if (this._formatURLCacheSize >= maxSize) {
