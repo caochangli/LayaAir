@@ -40,9 +40,14 @@ export class UBBParser {
     public lastSize: string;
 
     /**
-     * caochangli - 是否存在uub标签
+     * caochangli - 是否存在ubb标签
      */
     public existUBBTag:boolean;
+
+    /**
+     * caochangli - 是否存在ubb-color标签
+     */
+    public existColorTag:boolean;
 
     /**
      * @ignore
@@ -109,6 +114,7 @@ export class UBBParser {
 
     protected onTag_COLOR(tagName: string, end: boolean, attr: string): string {
         if (!end) {
+            this.existColorTag = true;
             this.lastColor = attr;
             return "<font color=\"" + attr + "\">";
         }
@@ -168,7 +174,8 @@ export class UBBParser {
      * @returns 生成的 HTML 字符串。
      */
     public parse(text: string, remove?: boolean): string {
-        this.existUBBTag = true;//caochangli - 默认设置为有uub标签
+        this.existUBBTag = true;//caochangli - 默认设置为有ubb标签
+        this.existColorTag = false;//caochangli - 默认设置为没有color标签
         this._text = text;
         this.lastColor = null;
         this.lastSize = null;

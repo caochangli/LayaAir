@@ -213,8 +213,8 @@ export class Text extends Sprite {
      */
     _onTranslate: (text: string, options: any, role?: number) => string;
 
-    /**caochangli - 是否存在uub标签 */
-    private _existUBBTag:boolean;
+    /**caochangli - 是否存在ubb-color标签 */
+    private _existUBBColorTag:boolean;
 
     /**
      * @en Constructor method of Text.
@@ -370,7 +370,7 @@ export class Text extends Sprite {
 
         if (this._text != value) {
             this._text = value;
-            this._existUBBTag = false;//caochangli
+            this._existUBBColorTag = false;//caochangli
             this.markChanged();
             this.event(Event.CHANGE);
         }
@@ -522,8 +522,8 @@ export class Text extends Sprite {
     set color(value: string) {
         if (this._textStyle.color != value) {
             this._textStyle.color = value;
-            //如果仅仅更新颜色，无需重新排版 - caochangli：仅勾选ubb但没ubb标签按常规文本处理
-            if (!this._isChanged && !this._html && (!this._ubb || !this._existUBBTag))
+            //如果仅仅更新颜色，无需重新排版 - caochangli：仅勾选ubb但没ubb标签或ubb标签中没color标签按常规文本处理
+            if (!this._isChanged && !this._html && (!this._ubb || !this._existUBBColorTag))
                 this._graphics.replaceTextColor(this._textStyle.color);
             else
                 this.markChanged();
@@ -1130,10 +1130,11 @@ export class Text extends Sprite {
 
         if (this._ubb) {
             text = UBBParser.defaultParser.parse(text);
-            // caochangli - 存在uub标签，才转换为html处理
-            this._existUBBTag = UBBParser.defaultParser.existUBBTag;
-            if (this._existUBBTag)
+            // caochangli - 存在ubb标签，才转换为html处理
+            if (UBBParser.defaultParser.existUBBTag) {
+                this._existUBBColorTag = UBBParser.defaultParser.existColorTag;
                 html = true;
+            }
         }
         if (!isPrompt && this._asPassword)
             text = Text._passwordChar.repeat(text.length);
