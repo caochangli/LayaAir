@@ -10,7 +10,31 @@ import { LayaGL } from "../../layagl/LayaGL";
 import { AtlasGrid, IAtlasRegion } from "./AtlasGrid";
 import { ILaya } from "../../../ILaya";
 import { ColorUtils } from "../../utils/ColorUtils";
+import { Config } from "../../../Config";
+import { Render2DProcessor } from "../../display/Render2DProcessor";
 
+
+/**caochangli - 文本预热项描述。 */
+export interface ITextWarmUpInfo {
+    /**文本内容。*/
+    text: string;
+    /**字体路径。默认字体可不传 */
+    fontPath?: string;
+    /**字号。默认 20。*/
+    fontSize?: number;
+    /**是否粗体。 */
+    bold?: boolean;
+    /**是否斜体。 */
+    italic?: boolean;
+    /**文本颜色。默认 #ffffff。*/
+    color?: string;
+    /**@zh 描边宽度。默认 0。 */
+    stroke?: number;
+    /**描边颜色。默认 #000000。 */
+    strokeColor?: string;
+    /**文本宽度预测量值。不传入时会内部测量。 */
+    width?: number;
+}
 
 /** @ignore @blueprintIgnore */
 export class TextRender {
@@ -100,7 +124,7 @@ export class TextRender {
                 let ri = this.charMap.get(key);
                 if (!ri) {
                     let width = TextRender.measureText(cc,ctx).width;//ctx.measureText(cc).width;
-                    ri = this.drawOffscreen(ctx, cc, width, fontSize, stroke, true);
+                    ri = this.drawOffscreen(ctx, cc, width, fontSize, stroke, true, key);
                     ri.key = key;
                     ri.isChar = true;
                     this.charMap.set(key, ri);
@@ -127,7 +151,7 @@ export class TextRender {
             if (!ri) {
                 if (preMeasuredWidth == null)
                     preMeasuredWidth = TextRender.measureText(text,ctx).width;//ctx.measureText(text).width;
-                ri = this.drawOffscreen(ctx, text, preMeasuredWidth, fontSize, stroke, false);
+                ri = this.drawOffscreen(ctx, text, preMeasuredWidth, fontSize, stroke, false, key);
                 ri.key = key;
                 ri.ref = 1;
                 this.textMap.set(key, ri);
@@ -146,24 +170,27 @@ export class TextRender {
         return renderInfo;
     }
 
-    private drawOffscreen(ctx: CanvasRenderingContext2D, text: string, width: number, height: number, lineWidth: number, charMode: boolean): ITextRenderInfo {
-        let margin = height / 3 | 0 + lineWidth;
-        let rectX = ((margin - fontSizeOffX - lineWidth) * fontScale | 0) - blockGap;
-        let rectY = ((margin - fontSizeOffY - lineWidth) * fontScale | 0) - blockGap;
-        let correctionW = height * 0.08; //某些字体（例如华文行楷，华文隶书，自带斜体效果，测算的宽度可能不够，这里补一些，0.08是经验值
-        let rectW = Math.ceil((width + fontSizeOffX + lineWidth * 2 + correctionW) * fontScale) + blockGap * 2;
-        let rectH = Math.ceil((fontSizeH + lineWidth * 2) * fontScale) + blockGap * 2;
+    private drawOffscreen(ctx: CanvasRenderingContext2D, text: string, width: number, height: number, lineWidth: number, charMode: boolean, key:string): ITextRenderInfo {
+        let imgdt = this.imageDataCache[key];
+        if (!imgdt) {
+            let margin = height / 3 | 0 + lineWidth;
+            let rectX = ((margin - fontSizeOffX - lineWidth) * fontScale | 0) - blockGap;
+            let rectY = ((margin - fontSizeOffY - lineWidth) * fontScale | 0) - blockGap;
+            let correctionW = height * 0.08; //某些字体（例如华文行楷，华文隶书，自带斜体效果，测算的宽度可能不够，这里补一些，0.08是经验值
+            let rectW = Math.ceil((width + fontSizeOffX + lineWidth * 2 + correctionW) * fontScale) + blockGap * 2;
+            let rectH = Math.ceil((fontSizeH + lineWidth * 2) * fontScale) + blockGap * 2;
 
-        let needCanvW = Math.min(rectW + Math.ceil(margin * 2 * fontScale), TextRenderConfig.maxCanvasWidth);
-        let needCanvH = Math.min(rectH + Math.ceil(margin * 2 * fontScale), TextRenderConfig.maxCanvasWidth);
-        if (needCanvW > this.canvas.width || needCanvH > this.canvas.height)
-            this.resizeCanvas(ctx, needCanvW, needCanvH);
+            let needCanvW = Math.min(rectW + Math.ceil(margin * 2 * fontScale), TextRenderConfig.maxCanvasWidth);
+            let needCanvH = Math.min(rectH + Math.ceil(margin * 2 * fontScale), TextRenderConfig.maxCanvasWidth);
+            if (needCanvW > this.canvas.width || needCanvH > this.canvas.height)
+                this.resizeCanvas(ctx, needCanvW, needCanvH);
 
-        ctx.clearRect(0, 0, Math.ceil(needCanvW / fontScale), Math.ceil(needCanvH / fontScale));
-        lineWidth > 0 && ctx.strokeText(text, margin, margin + height / 2);
-        ctx.fillText(text, margin, margin + height / 2);
+            ctx.clearRect(0, 0, Math.ceil(needCanvW / fontScale), Math.ceil(needCanvH / fontScale));
+            lineWidth > 0 && ctx.strokeText(text, margin, margin + height / 2);
+            ctx.fillText(text, margin, margin + height / 2);
 
-        let imgdt = ctx.getImageData(rectX, rectY, rectW, rectH);
+            imgdt = ctx.getImageData(rectX, rectY, rectW, rectH);
+        }
 
         let ri: ITextRenderInfo = {
             x: - (fontSizeOffX + lineWidth),
@@ -332,7 +359,7 @@ export class TextRender {
                     atlas.grid.reset();
                 }
             }
-            else
+            else 
                 this.freeRegions.push(ri.region);
         }
         else {
@@ -376,6 +403,8 @@ export class TextRender {
             this.free(ri);
         }
         this.charMap.clear(); //没引用的已经清理掉，有引用的可以等free时清理
+
+        this.imageDataCache = {};
     }
 
     GC(): void {
@@ -396,6 +425,216 @@ export class TextRender {
         }
     }
 
+//#region caochangli - 文本预热，缓解渲染时ctx.getImageData压力
+
+    /**文本预热缓存上限(单位字节) */
+    static textWarmpCacheMax:number = 30 * 1024 * 1024;
+
+    /**
+     * 文本预热 - 缓解渲染时ctx.getImageData压力
+     * @param items 要预热的列表
+     * @param clearCache 是否清理之前的预热缓存
+     */
+    static textWarmp(items: Array<ITextWarmUpInfo>,clearCache:boolean = false):void {
+        if (!items || items.length <= 0)
+            return;
+        Render2DProcessor.runner._textRender.textWarmp(items,clearCache);
+    }
+
+    /**获取文本预热缓存 */
+    static get ImageDataCache():Record<string,ImageData> {
+        return Render2DProcessor.runner._textRender.imageDataCache;
+    }
+
+    /**清理文本预热缓存 */
+    static clearImageDataCache():void {
+        Render2DProcessor.runner._textRender.clearImageDataCache();
+    }
+
+    /**imageDate缓存字典 */
+    private imageDataCache:Record<string,ImageData> = {};
+    /**imageDate已缓存大小(单位字节) */
+    private imageDataCacheSize:number = 0;
+    /**带预热文本列表 */
+    private warmpList:Array<ITextWarmUpInfo>;
+    /**是否预热文本中 */
+    private isWarmpTimeIng:boolean;
+    /**默认字体 */
+    private defaultFont:string;
+
+    /**文本预热 */
+    private textWarmp(items: Array<ITextWarmUpInfo>,clearCache:boolean = false):void {
+
+        if (!this.defaultFont) {
+            let fontObj = ILaya.loader.getRes(Config.defaultFont);
+            if (fontObj)
+                this.defaultFont = fontObj.family;
+        }
+
+        if (clearCache) {
+            this.clearImageDataCache();
+            this.warmpList = items.slice();
+        } 
+        else {
+            if (this.warmpList)
+                this.warmpList = this.warmpList.concat(items);
+            else
+                this.warmpList = items.slice();
+        }
+
+        this.startWarmpTime();
+    }
+
+    /**清理文本预热缓存 */
+    private clearImageDataCache():void {
+        this.stopWarmpTime();
+        this.imageDataCache = {};
+        this.imageDataCacheSize = 0;
+    }
+
+    private startWarmpTime():void {
+        if (!this.isWarmpTimeIng) {
+            this.isWarmpTimeIng = true;
+            // 微小真机测试 - 5帧间隔差不多
+            ILaya.systemTimer.frameLoop(5, this, this.frameTextWarmUp);
+        }
+    }
+
+    private stopWarmpTime():void {
+        if (this.isWarmpTimeIng) {
+            this.isWarmpTimeIng = false;
+            ILaya.systemTimer.clear(this, this.frameTextWarmUp);
+        }
+    }
+
+    /**文本预热，缓解ctx.getImageData并发压力 */
+    private frameTextWarmUp(): void {
+        if (!this.warmpList || this.warmpList.length <= 0) {
+            this.stopWarmpTime();
+            return;
+        }
+        let textWarmpCacheMax = TextRender.textWarmpCacheMax;
+        // 容量超上限
+        if (this.imageDataCacheSize >= textWarmpCacheMax) {
+            this.stopWarmpTime();
+            this.warmpList.length = 0;
+            return;
+        }
+        // 卡顿
+        if (ILaya.timer.isBusy(50))
+            return;
+
+        while (this.warmpList.length > 0)
+        {
+            let item:ITextWarmUpInfo = this.warmpList.pop();
+            let text = item.text;
+            if (!text || text.length > 50)
+                continue;
+            
+            let font = this.defaultFont;
+            if (item.fontPath) {
+                let fontObj = ILaya.loader.getRes(item.fontPath);
+                if (fontObj)
+                    font = fontObj.family;
+                else {
+                    console.warn("预热文本未找到字体",item.fontPath);
+                    continue;
+                }
+            }
+            let fontSize = item.fontSize || Config.defaultFontSize;
+            let bold = !!item.bold;
+            let color = item.color || '#ffffff';
+            let stroke = item.stroke || 0;
+            let strokeColor = stroke > 0 ? item.strokeColor || '#000000' : null;
+
+            let hasEmoji = emojiTest.test(text);
+            let curFont = this.getFont(font);
+            let info = bold ? curFont.bold : curFont.normal;
+            let k = fontSize / TextRenderConfig.standardFontSize;
+            fontSizeOffX = Math.ceil(info.xoff * k);
+            emojiAdjustY = hasEmoji ? Math.ceil(info.eoff * k) : 0;
+            fontSizeOffY = Math.ceil(info.yoff * k) + emojiAdjustY;
+            fontSizeH = Math.ceil((hasEmoji ? info.ebbxh : info.bbxh) * k);
+            fontScale = TextRenderConfig.fontScale;
+
+            let cacheKey = (curFont.id * 10000) + fontSize + (bold ? "b_" : "_");
+            //整句模式：染色的条件为 有描边 或 包含emoji
+            let tint = stroke > 0 || hasEmoji;
+            if (tint)
+                cacheKey += ColorUtils.create(color).numColor + "_";
+            if (stroke > 0)
+                cacheKey += ColorUtils.create(strokeColor).numColor + "_" + stroke + "_";
+
+            let key = cacheKey + text;
+            if (this.textMap.has(key))
+                continue;
+            if (this.imageDataCache[key])
+                continue;
+
+            let ctx = this.ctx;
+            ctx.font = (bold ? "bold " : "") + fontSize + "px " + font;
+            ctx.setTransform(fontScale, 0, 0, fontScale, 0, 0);
+            ctx.textBaseline = "middle";
+            ctx.fillStyle = tint ? color : 'white';
+            if (stroke > 0) {
+                ctx.lineJoin = "round";
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = stroke;
+            }
+            else {
+                ctx.lineWidth = 0;
+            }
+
+            let width = item.width;
+            if (!width)
+                width = TextRender.measureText(text, ctx).width;
+            // let ri = this.drawOffscreen(ctx, text, width, fontSize, stroke, false);
+            // ri.key = key;
+            // ri.ref = 0; // warm-up 不上屏，不需要引用；textMap不会被GC扫描，ref=0可稳定驻留
+            // this.textMap.set(key, ri);
+
+            let imgdt = this._getImageDate(ctx,text,width,fontSize,stroke);
+            this.imageDataCache[key] = imgdt;
+            this.imageDataCacheSize += imgdt.data.byteLength;
+
+            if (this.warmpList.length <= 0) {
+                this.stopWarmpTime();
+                break;
+            }
+            // 容量超上限
+            if (this.imageDataCacheSize >= textWarmpCacheMax) {
+                this.stopWarmpTime();
+                this.warmpList.length = 0;
+                break;
+            }
+            // 卡顿
+            if (ILaya.timer.isBusy(50))
+                break;
+        }        
+    }
+
+    private _getImageDate(ctx: CanvasRenderingContext2D, text: string, width: number, height: number, lineWidth: number): ImageData {
+        let margin = height / 3 | 0 + lineWidth;
+        let rectX = ((margin - fontSizeOffX - lineWidth) * fontScale | 0) - blockGap;
+        let rectY = ((margin - fontSizeOffY - lineWidth) * fontScale | 0) - blockGap;
+        let correctionW = height * 0.08; //某些字体（例如华文行楷，华文隶书，自带斜体效果，测算的宽度可能不够，这里补一些，0.08是经验值
+        let rectW = Math.ceil((width + fontSizeOffX + lineWidth * 2 + correctionW) * fontScale) + blockGap * 2;
+        let rectH = Math.ceil((fontSizeH + lineWidth * 2) * fontScale) + blockGap * 2;
+
+        let needCanvW = Math.min(rectW + Math.ceil(margin * 2 * fontScale), TextRenderConfig.maxCanvasWidth);
+        let needCanvH = Math.min(rectH + Math.ceil(margin * 2 * fontScale), TextRenderConfig.maxCanvasWidth);
+        if (needCanvW > this.canvas.width || needCanvH > this.canvas.height)
+            this.resizeCanvas(ctx, needCanvW, needCanvH);
+
+        ctx.clearRect(0, 0, Math.ceil(needCanvW / fontScale), Math.ceil(needCanvH / fontScale));
+        lineWidth > 0 && ctx.strokeText(text, margin, margin + height / 2);
+        ctx.fillText(text, margin, margin + height / 2);
+
+        let imgdt = ctx.getImageData(rectX, rectY, rectW, rectH);
+        return imgdt;
+    }
+
+//#endregion caochangli - 文本预热，缓解渲染时ctx.getImageData压力
 
 //#region caochangli - 缓存文本宽度
     
@@ -405,24 +644,24 @@ export class TextRender {
     private static _nullTextMetrics:any = {width:0};
 
     /**是否启动文本宽度缓存 */
-    public static set enableTextWidthCache(value:boolean) {
+    static set enableTextWidthCache(value:boolean) {
         this._enableTextWidthCache = value;
         if (!this._enableTextWidthCache) {// 关闭缓存
             this._textWidthCache = {};
             this._textWidthCacheSize = 0;
         }
     }
-    public static get enableTextWidthCache():boolean { return this._enableTextWidthCache; }
+    static get enableTextWidthCache():boolean { return this._enableTextWidthCache; }
     /**文本宽度缓存 - 最大上限 */
-    public static textWidthCacheMax = 3000;
+    static textWidthCacheMax = 3000;
     
     /**caochangli - 测量文本尺寸：利用缓存机制 */
-    public static measureText(text:string,ctx?:CanvasRenderingContext2D):TextMetrics {
+    static measureText(text:string,ctx?:CanvasRenderingContext2D):TextMetrics {
         if (!text) 
             return this._nullTextMetrics;
         let context = ctx || Browser.context;
         // 未开启缓存或文本太长 - 不缓存
-        if (!this._enableTextWidthCache || text.length >= 200)
+        if (!this._enableTextWidthCache || text.length > 100)
             return context.measureText(text);
 
         let fontDir = this._textWidthCache[context.font];
