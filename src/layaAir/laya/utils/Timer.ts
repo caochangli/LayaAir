@@ -74,6 +74,36 @@ export class Timer {
     }
 
     /**
+     * 是否忙碌中 - 结合上一帧耗时和当前帧已过时间（caochangli）
+     * @param minFrame 最低帧率：低于此帧率时表示忙碌，返回true
+     */
+    isBusy(minFrame:number = 30):boolean
+    {
+        // 帧率    间隔
+        // 60  ->  16
+        // 50  ->  20
+        // 40  ->  25
+        // 30  ->  32
+        // 20  ->  50
+        // 10  ->  100
+        let maxDelta = 1000/minFrame;
+        // 上一帧
+        if (maxDelta < this.delta)
+            return true;
+        // 本帧 - frameElapsed获取时本帧后续可能还有高开销逻辑要执行
+        return maxDelta < this.frameElapsed;
+    }
+
+    /**
+     * 当前帧是否忙碌中 - 判断时本帧后续可能还有高开销逻辑要执行（caochangli）
+     * @param minFrame 最低帧率：低于此帧率时表示忙碌，返回true
+     */
+    isCurFrameBusy(minFrame:number = 30):boolean
+    {
+        return 1000/minFrame < this.frameElapsed;
+    }
+
+    /**
      * @en The frame update handling function.
      * @zh 帧循环处理函数。
      */
