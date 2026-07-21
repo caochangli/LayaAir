@@ -81,6 +81,10 @@ export class FillTextCmd implements IGraphicsCmd {
      * @zh 是否单字分开渲染
      */
     singleCharRender: boolean;
+    /**
+     * caochangli - 是否运行时缓存文本ImageData。
+     */
+    isRunTimeCache: boolean;
 
     /** 
      * @internal 
@@ -126,6 +130,7 @@ export class FillTextCmd implements IGraphicsCmd {
         cmd.text = text;
         cmd.align = align ?? 'left';
         cmd.singleCharRender = false;
+        cmd.isRunTimeCache = true;
         cmd._preMeasuredWidth = null;
 
         return cmd;
@@ -236,7 +241,7 @@ export class FillTextCmd implements IGraphicsCmd {
         this._renderInfo = runner._textRender.draw(this.text, this.x + gx, this.y + gy,
             this.fontFamily ? this.fontFamily : Config.defaultFont,
             this.fontSize, this.bold, this.italic,
-            this.color, this.stroke, this.strokeColor, this.singleCharRender,
+            this.color, this.stroke, this.strokeColor, this.singleCharRender, this.isRunTimeCache,
             tw, this._renderInfo
         );
     }

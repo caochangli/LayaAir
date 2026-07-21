@@ -404,6 +404,17 @@ export class GTextInput extends GWidget {
         this.textIns.overflow = value;
     }
 
+    /**
+     * caochangli - 是否运行时缓存文本ImageData。缓解文本字符串通过GPU转成纹理像素的性能开销 
+     */
+    get isRunTimeCache(): boolean {
+        return this.textIns.isRunTimeCache;
+    }
+
+    set isRunTimeCache(value: boolean) {
+        this.textIns.isRunTimeCache = value;
+    }
+
     /** @ignore */
     protected _transChanged(kind: TransformKind): void {
         super._transChanged(kind);

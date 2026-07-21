@@ -70,7 +70,7 @@ export class TextRender {
     draw(text: string, x: number, y: number,
         font: string, fontSize: number, bold: boolean, italic: boolean,
         color: string, stroke: number, strokeColor: string,
-        charMode: boolean, preMeasuredWidth: number, renderInfo?: ITextRenderInfo[]): ITextRenderInfo[] {
+        charMode: boolean, isRunTimeCache:boolean, preMeasuredWidth: number, renderInfo?: ITextRenderInfo[]): ITextRenderInfo[] {
 
         let hasEmoji = emojiTest.test(text);
         let curFont = this.getFont(font);
@@ -124,7 +124,7 @@ export class TextRender {
                 let ri = this.charMap.get(key);
                 if (!ri) {
                     let width = TextRender.measureText(cc,ctx).width;//ctx.measureText(cc).width;
-                    ri = this.drawOffscreen(ctx, cc, width, fontSize, stroke, true, key);
+                    ri = this.drawOffscreen(ctx, cc, width, fontSize, stroke, true, isRunTimeCache, key);
                     ri.key = key;
                     ri.isChar = true;
                     this.charMap.set(key, ri);
@@ -145,13 +145,29 @@ export class TextRender {
             let key = cacheKey + text;
             let ri = this.textMap.get(key);
             //先引用住，再清理，对于同一个文本仅改色或者重绘时，有极大优化
-            ri && ri.ref++;
+            if (ri) {
+                // caochangli - 该区域被同文本再次启用
+                if (ri.ref === 0 && ri.region != null) {
+                    // 其atlas计数+1
+                    ri.region.owner.ref++;
+                    // 从freeRegions中删除
+                    let i = this.freeRegions.indexOf(ri.region);
+                    if (i !== -1) {
+                        this.freeRegions[i] = null;
+                        if (++freeRegionNullCnt > 50) {
+                            this.freeRegions = this.freeRegions.filter(r => r != null);
+                            freeRegionNullCnt = 0;
+                        }
+                    }
+                }
+                ri.ref++;
+            }
             renderInfo[0] && this.free(renderInfo[0]);
 
             if (!ri) {
                 if (preMeasuredWidth == null)
                     preMeasuredWidth = TextRender.measureText(text,ctx).width;//ctx.measureText(text).width;
-                ri = this.drawOffscreen(ctx, text, preMeasuredWidth, fontSize, stroke, false, key);
+                ri = this.drawOffscreen(ctx, text, preMeasuredWidth, fontSize, stroke, false, isRunTimeCache, key);
                 ri.key = key;
                 ri.ref = 1;
                 this.textMap.set(key, ri);
@@ -170,8 +186,13 @@ export class TextRender {
         return renderInfo;
     }
 
-    private drawOffscreen(ctx: CanvasRenderingContext2D, text: string, width: number, height: number, lineWidth: number, charMode: boolean, key:string): ITextRenderInfo {
-        let imgdt = this.imageDataCache[key];
+    private drawOffscreen(ctx: CanvasRenderingContext2D, text: string, width: number, height: number, lineWidth: number, charMode: boolean, isRunTimeCache:boolean, key:string): ITextRenderInfo {
+        let isWarmpText = false; //是否预热文本
+        let imgdt = this.warmpCache[key];
+        if (!imgdt)
+            imgdt = this.getRunTimeImgdt(key);
+        else
+            isWarmpText = true;
         if (!imgdt) {
             let margin = height / 3 | 0 + lineWidth;
             let rectX = ((margin - fontSizeOffX - lineWidth) * fontScale | 0) - blockGap;
@@ -211,6 +232,20 @@ export class TextRender {
             ri.tex = this.createIsoTexture(imgdt.width, imgdt.height);
             this.setPixelsToTexture(imgdt, ri.tex, 0, 0, ri.uv);
         } else {
+            // caochangli - 对于没预热且短文本进行runTime缓存
+            // 这里有点狗：之前imgdt只是临时对象，在setPixelsToTexture上传GPU后，cpu持有的这份内存自动回收了
+            // 而ri.imgdt赋值等于cpu持有了内存，加上之后setPixelsToTexture GPU也持有了内存，就是双份内存了
+            // 但这里如果cpu不持有，则在textMap.delete时拿不到要缓存的imgdt对象了
+            if (isRunTimeCache && !isWarmpText && TextRender._runTimeCacheMax && TextRender._useCpuHoldMax && text.length <= TextRender._runTimeAndWarmpLengthMax) {
+                let useCpuHoldSize = this.useCpuHoldSize + imgdt.data.byteLength;
+                // 因为cpu、gpu都持有，双份内存 - 这里做上限保护。ri.imgdt不存在的将无法缓存到runtime
+                if (useCpuHoldSize <= TextRender._useCpuHoldMax) {
+                    ri.imgdt = imgdt;
+                    this.useCpuHoldSize = useCpuHoldSize;
+                }
+            }
+            // caochangli - 对于没预热且短文本进行runTime缓存
+
             ri.region = this.addToAtlas(imgdt.width, imgdt.height);
             ri.tex = ri.region.owner.tex;
             this.setPixelsToTexture(imgdt, ri.tex, ri.region.x, ri.region.y, ri.uv);
@@ -265,6 +300,16 @@ export class TextRender {
                 this.freeRegions = this.freeRegions.filter(r => r != null);
                 freeRegionNullCnt = 0;
             }
+    
+            // caochangli - 该区域被其他文本复用时，删除原textMap
+            if (region.key != null) {
+                let r = this.textMap.get(region.key);
+                if (r.imgdt)
+                    this.addRunTimeCache(r.key,r.imgdt);
+                this.textMap.delete(region.key);
+                region.key = null;
+            }
+
             region.owner.ref++;
             return region;
         }
@@ -338,7 +383,9 @@ export class TextRender {
 
             this.charMap.delete(ri.key);
         }
-        else
+        // else
+        // caochangli - 图集中的文本，暂不回收（调整到区域被复用时或整张atlas销毁或重置时）
+        else if (!ri.region)
             this.textMap.delete(ri.key);
 
         if (ri.region != null) {
@@ -348,6 +395,15 @@ export class TextRender {
                 if (this.freeRegions.length > 0)
                     this.freeRegions = this.freeRegions.filter(r => r != null && r.owner !== atlas);
                 freeRegionNullCnt = 0;
+
+                // caochangli - 整张atlas销毁或重置时，删除其上所有的textMap
+                for (let [k, r] of this.textMap) {
+                    if (r.ref <= 0 && r.region != null && r.region.owner === atlas) {
+                        this.textMap.delete(k);
+                        if (r.imgdt)
+                            this.addRunTimeCache(r.key,r.imgdt);
+                    }
+                }
 
                 //看看是不是已经有空白的了。只保留一个空白的，避免占用过多内存
                 if (this.textAtlases.length > 2 && this.textAtlases.findIndex((a) => a.ref === 0) !== -1) {
@@ -359,8 +415,12 @@ export class TextRender {
                     atlas.grid.reset();
                 }
             }
-            else 
+            else {
+                // caochangli - 区域返回空闲池时标记key
+                if (!ri.isChar)
+                    ri.region.key = ri.key;
                 this.freeRegions.push(ri.region);
+            }
         }
         else {
             this.freeIsoTextures.push(ri.tex);
@@ -392,6 +452,11 @@ export class TextRender {
     onFontScaleChanged(): void {
         this.textMap.clear();
 
+        // caochangli - 补充回收
+        this.freeRegions.length = 0;
+        freeRegionNullCnt = 0;
+        // caochangli - 补充回收
+
         toClearChars.length = 0;
         for (let [_, ri] of this.charMap) {
             if (ri.ref === 0)
@@ -404,7 +469,12 @@ export class TextRender {
         }
         this.charMap.clear(); //没引用的已经清理掉，有引用的可以等free时清理
 
-        this.imageDataCache = {};
+        // caochangli - 清理runTime
+        this.clearRunTimeCache();
+        // caochangli - 清理预热
+        this.clearWarmpCache();
+        // caochangli - 重置使用时cpu已持有的ImageData内存大小
+        this.useCpuHoldSize = 0;
     }
 
     GC(): void {
@@ -425,37 +495,125 @@ export class TextRender {
         }
     }
 
+//#region caochangli - 运行时文本ImageData缓存（不包括预热文本）
+
+    /**文本runTime和预热缓存 - 文本长度限制 */
+    private static _runTimeAndWarmpLengthMax:number = 30;
+    /**文本runTime和预热缓存 - 文本长度限制 */
+    static set runTimeAndWarmpLengthMax(value:number) {this._runTimeAndWarmpLengthMax = value;}
+    static get runTimeAndWarmpLengthMax():number {return this._runTimeAndWarmpLengthMax}
+
+    /**使用时cpu持有的ImageData内存上限(单位字节) - 只有cpu先持有，才能进入runTimeCache，若上限为0也表示runtimeCache不缓存 */
+    private static _useCpuHoldMax:number = 15 * 1024 * 1024;
+    /**使用时cpu持有的ImageData内存上限(单位字节) - 只有cpu先持有，才能进入runTimeCache，若上限为0也表示runtimeCache不缓存 */
+    static set useCpuHoldMax(value:number) {
+        this._useCpuHoldMax = value;
+        if (this._useCpuHoldMax <= 0)//cpu不持有，则runTimeCache不缓存
+            Render2DProcessor.runner._textRender.clearRunTimeCache();
+    }
+    static get useCpuHoldMax():number {return this._useCpuHoldMax}
+    /**使用时cpu已持有的ImageData内存大小 */
+    private useCpuHoldSize:number = 0;
+
+
+    /**运行时文本ImageData缓存上限(单位字节， 小于等于0 表示关闭缓存) */
+    private static _runTimeCacheMax:number = 10 * 1024 * 1024;
+    /**运行时文本ImageData缓存上限(单位字节， 小于等于0 表示关闭缓存) */
+    static set runTimeCacheMax(value:number) {
+        this._runTimeCacheMax = value;
+        if (this._runTimeCacheMax <= 0)
+            Render2DProcessor.runner._textRender.clearRunTimeCache();
+    }
+    static get runTimeCacheMax():number {return this._runTimeCacheMax}
+
+    /**运行时文本ImageData缓存字典 */
+    private runTimeCache:Record<string,ImageData> = {}; 
+    /**运行时文本ImageData已缓存大小(单位字节) */
+    private runTimeCacheSize:number = 0;
+    
+    /**添加runTime缓存 */
+    private addRunTimeCache(key:string,imgdt:ImageData):void
+    {
+        this.useCpuHoldSize -= imgdt.data.byteLength;
+        if (this.useCpuHoldSize < 0)
+            this.useCpuHoldSize = 0;
+        let runTimeCacheMax = TextRender._runTimeCacheMax;
+        if (runTimeCacheMax <= 0)
+            return;
+
+        // 超容量上限 - 删除一半
+        if (this.runTimeCacheSize >= runTimeCacheMax)
+        {
+            let halfMax = Math.floor(runTimeCacheMax/2);
+            for (let key in this.runTimeCache)
+            {
+                let imgdt = this.runTimeCache[key];
+                delete this.runTimeCache[key];
+                this.runTimeCacheSize -= imgdt.data.byteLength;
+                if (this.runTimeCacheSize < halfMax)
+                    break;
+            }
+            if (this.runTimeCacheSize < 0)
+                this.runTimeCacheSize = 0;
+        }
+        this.runTimeCache[key] = imgdt;
+        this.runTimeCacheSize += imgdt.data.byteLength;
+    }
+
+    /**获取runTime缓存 */
+    private getRunTimeImgdt(key:string):ImageData
+    {
+        let imgdt = this.runTimeCache[key];
+        if (imgdt)
+        {
+            delete this.runTimeCache[key];
+            this.runTimeCacheSize -= imgdt.data.byteLength;
+            if (this.runTimeCacheSize < 0)
+                this.runTimeCacheSize = 0;
+        }
+        return imgdt;
+    }
+
+    /**清理runTime缓存 */
+    private clearRunTimeCache():void
+    {
+        this.runTimeCache = {};
+        this.runTimeCacheSize = 0;
+    }
+//#endregion caochangli - 运行时文本ImageData缓存（不包括预热文本）
+
+
 //#region caochangli - 文本预热，缓解渲染时ctx.getImageData压力
 
     /**文本预热缓存上限(单位字节) */
-    static textWarmpCacheMax:number = 30 * 1024 * 1024;
+    static warmpCacheMax:number = 10 * 1024 * 1024;
 
     /**
-     * 文本预热 - 缓解渲染时ctx.getImageData压力
+     * 文本预热 - 缓解渲染时ctx.getImageData压力(常驻)
      * @param items 要预热的列表
      * @param clearCache 是否清理之前的预热缓存
      */
-    static textWarmp(items: Array<ITextWarmUpInfo>,clearCache:boolean = false):void {
+    static warmp(items: Array<ITextWarmUpInfo>,clearCache:boolean = false):void {
         if (!items || items.length <= 0)
             return;
-        Render2DProcessor.runner._textRender.textWarmp(items,clearCache);
+        Render2DProcessor.runner._textRender.warmp(items,clearCache);
     }
 
     /**获取文本预热缓存 */
-    static get ImageDataCache():Record<string,ImageData> {
-        return Render2DProcessor.runner._textRender.imageDataCache;
+    static get warmpCache():Record<string,ImageData> {
+        return Render2DProcessor.runner._textRender.warmpCache;
     }
 
     /**清理文本预热缓存 */
-    static clearImageDataCache():void {
-        Render2DProcessor.runner._textRender.clearImageDataCache();
+    static clearWarmpCache():void {
+        Render2DProcessor.runner._textRender.clearWarmpCache();
     }
 
-    /**imageDate缓存字典 */
-    private imageDataCache:Record<string,ImageData> = {};
-    /**imageDate已缓存大小(单位字节) */
-    private imageDataCacheSize:number = 0;
-    /**带预热文本列表 */
+    /**已预热的imageDate缓存字典 */
+    private warmpCache:Record<string,ImageData> = {};
+    /**已预热的imageDate缓存大小(单位字节) */
+    private warmpCacheSize:number = 0;
+    /**待预热文本列表 */
     private warmpList:Array<ITextWarmUpInfo>;
     /**是否预热文本中 */
     private isWarmpTimeIng:boolean;
@@ -463,7 +621,7 @@ export class TextRender {
     private defaultFont:string;
 
     /**文本预热 */
-    private textWarmp(items: Array<ITextWarmUpInfo>,clearCache:boolean = false):void {
+    private warmp(items: Array<ITextWarmUpInfo>,clearCache:boolean = false):void {
 
         if (!this.defaultFont) {
             let fontObj = ILaya.loader.getRes(Config.defaultFont);
@@ -472,7 +630,7 @@ export class TextRender {
         }
 
         if (clearCache) {
-            this.clearImageDataCache();
+            this.clearWarmpCache();
             this.warmpList = items.slice();
         } 
         else {
@@ -486,36 +644,37 @@ export class TextRender {
     }
 
     /**清理文本预热缓存 */
-    private clearImageDataCache():void {
+    private clearWarmpCache():void {
         this.stopWarmpTime();
-        this.imageDataCache = {};
-        this.imageDataCacheSize = 0;
+        this.warmpCache = {};
+        this.warmpCacheSize = 0;
     }
 
     private startWarmpTime():void {
         if (!this.isWarmpTimeIng) {
             this.isWarmpTimeIng = true;
             // 微小真机测试 - 5帧间隔差不多
-            ILaya.systemTimer.frameLoop(5, this, this.frameTextWarmUp);
+            ILaya.systemTimer.frameLoop(5, this, this.frameWarmUp);
         }
     }
 
     private stopWarmpTime():void {
         if (this.isWarmpTimeIng) {
             this.isWarmpTimeIng = false;
-            ILaya.systemTimer.clear(this, this.frameTextWarmUp);
+            ILaya.systemTimer.clear(this, this.frameWarmUp);
         }
     }
 
     /**文本预热，缓解ctx.getImageData并发压力 */
-    private frameTextWarmUp(): void {
+    private frameWarmUp(): void {
         if (!this.warmpList || this.warmpList.length <= 0) {
             this.stopWarmpTime();
             return;
         }
-        let textWarmpCacheMax = TextRender.textWarmpCacheMax;
+        let textWarmpCacheMax = TextRender.warmpCacheMax;
+        let lengthMax = TextRender._runTimeAndWarmpLengthMax;
         // 容量超上限
-        if (this.imageDataCacheSize >= textWarmpCacheMax) {
+        if (this.warmpCacheSize >= textWarmpCacheMax) {
             this.stopWarmpTime();
             this.warmpList.length = 0;
             return;
@@ -528,7 +687,7 @@ export class TextRender {
         {
             let item:ITextWarmUpInfo = this.warmpList.pop();
             let text = item.text;
-            if (!text || text.length > 50)
+            if (!text || text.length > lengthMax)
                 continue;
             
             let font = this.defaultFont;
@@ -568,7 +727,7 @@ export class TextRender {
             let key = cacheKey + text;
             if (this.textMap.has(key))
                 continue;
-            if (this.imageDataCache[key])
+            if (this.warmpCache[key])
                 continue;
 
             let ctx = this.ctx;
@@ -588,21 +747,16 @@ export class TextRender {
             let width = item.width;
             if (!width)
                 width = TextRender.measureText(text, ctx).width;
-            // let ri = this.drawOffscreen(ctx, text, width, fontSize, stroke, false);
-            // ri.key = key;
-            // ri.ref = 0; // warm-up 不上屏，不需要引用；textMap不会被GC扫描，ref=0可稳定驻留
-            // this.textMap.set(key, ri);
-
             let imgdt = this._getImageDate(ctx,text,width,fontSize,stroke);
-            this.imageDataCache[key] = imgdt;
-            this.imageDataCacheSize += imgdt.data.byteLength;
+            this.warmpCache[key] = imgdt;
+            this.warmpCacheSize += imgdt.data.byteLength;
 
             if (this.warmpList.length <= 0) {
                 this.stopWarmpTime();
                 break;
             }
             // 容量超上限
-            if (this.imageDataCacheSize >= textWarmpCacheMax) {
+            if (this.warmpCacheSize >= textWarmpCacheMax) {
                 this.stopWarmpTime();
                 this.warmpList.length = 0;
                 break;
@@ -638,30 +792,33 @@ export class TextRender {
 
 //#region caochangli - 缓存文本宽度
     
-    private static _enableTextWidthCache:boolean = true;
     private static _textWidthCache:Record<string,Record<string,TextMetrics>> = {};
     private static _textWidthCacheSize:number = 0;
+    private static _textWidthCacheMax:number = 3000;
+    private static _textWidthCacheLengthMax:number = 100;
     private static _nullTextMetrics:any = {width:0};
-
-    /**是否启动文本宽度缓存 */
-    static set enableTextWidthCache(value:boolean) {
-        this._enableTextWidthCache = value;
-        if (!this._enableTextWidthCache) {// 关闭缓存
+    
+    /**文本宽度缓存 - 最大个数上限（小于等于0 表示关闭缓存） */
+    static set textWidthCacheMax(value:number) {
+        this._textWidthCacheMax = value;
+        if (this._textWidthCacheMax <= 0) {// 关闭缓存
             this._textWidthCache = {};
             this._textWidthCacheSize = 0;
         }
     }
-    static get enableTextWidthCache():boolean { return this._enableTextWidthCache; }
-    /**文本宽度缓存 - 最大上限 */
-    static textWidthCacheMax = 3000;
-    
+    static get textWidthCacheMax():number {return this._textWidthCacheMax}
+
+    /**文本宽度缓存 - 文本长度限制 */
+    static set textWidthCacheLengthMax(value:number) {this._textWidthCacheLengthMax = value;}
+    static get textWidthCacheLengthMax():number {return this._textWidthCacheLengthMax}
+
     /**caochangli - 测量文本尺寸：利用缓存机制 */
     static measureText(text:string,ctx?:CanvasRenderingContext2D):TextMetrics {
         if (!text) 
             return this._nullTextMetrics;
         let context = ctx || Browser.context;
         // 未开启缓存或文本太长 - 不缓存
-        if (!this._enableTextWidthCache || text.length > 100)
+        if (this._textWidthCacheMax <= 0 || text.length > this._textWidthCacheLengthMax)
             return context.measureText(text);
 
         let fontDir = this._textWidthCache[context.font];
@@ -674,7 +831,7 @@ export class TextRender {
             this._textWidthCache[context.font] = fontDir = {};
             
         // 超过最大容量时删除缓存
-        if (this._textWidthCacheSize >= this.textWidthCacheMax) {
+        if (this._textWidthCacheSize >= this._textWidthCacheMax) {
             this._textWidthCache = {};
             this._textWidthCacheSize = 0;
             this._textWidthCache[context.font] = fontDir = {};
@@ -732,14 +889,18 @@ interface ITextRenderInfo {
     advance: number;
     uv: number[];
     tex: Texture2D;
-    region: IAtlasRegion & { owner: ITextAtlas };
+    region: IAtlasRegionWithOwner;
     key?: string;
     ref: number;
     isChar?: boolean;
+    /**caochangli - 增加imgdt */
+    imgdt?:ImageData;
 }
 
 interface IAtlasRegionWithOwner extends IAtlasRegion {
     owner: ITextAtlas;
+    /**caochangli - 增加key标记 */
+    key?: string;
 }
 
 interface ITextAtlas {

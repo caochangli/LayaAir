@@ -30,6 +30,7 @@ var s_Point = new Point();
 var s_rect = new Rectangle();
 var s_rect2 = new Rectangle();
 var s_endPos = new Point();
+var s_velocity = new Point();//caochangli - 增加惯性速度全局变量
 var s_oldChange = new Point();
 var s_gestureFlag = 0;
 
@@ -1448,6 +1449,13 @@ export class Scroller implements IScroller {
             //更新速度
             if (!this._inertiaDisabled) {
                 let velocity = DragSupport.computeVelocity(this._slidingPoints);
+
+                // caochangli - 提高惯性速度
+                let raiseVelocity = UIConfig2.defaultScrollRaiseVelocity;
+                if (raiseVelocity != 1)
+                    velocity = s_velocity.setTo(velocity.x * raiseVelocity, velocity.y * raiseVelocity);
+                // caochangli - 提高惯性速度
+
                 this.updateTargetAndDuration(this._tweenStart, velocity, "x", s_endPos, this._tweenDuration);
                 this.updateTargetAndDuration(this._tweenStart, velocity, "y", s_endPos, this._tweenDuration);
             }

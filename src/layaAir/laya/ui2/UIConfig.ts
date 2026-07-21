@@ -47,6 +47,11 @@ export class UIConfig2 {
     static defaultScrollDecelerationRate: number = 0.967;
 
     /**
+     * caochangli - 滚动视图在触摸结束时的惯性速率增加值(真机设备上滑动不太跟手)。
+     */
+    static defaultScrollRaiseVelocity: number = 1;
+
+    /**
      * @en Default scrollbar display mode. Recommened visible for Desktop and Auto for mobile.
      * @zh 默认滚动条显示模式。推荐桌面使用Visible，移动端使用Auto。
      */

@@ -115,6 +115,10 @@ export class Text extends Sprite {
      * @zh 拆分渲染。
      */
     protected _singleCharRender: boolean = false;
+    /**
+     * caochangli - 是否运行时缓存文本ImageData。
+     */
+    protected _isRunTimeCache: boolean = true;
     protected _textStyle: TextStyle;
     protected _prompt: string = '';
 
@@ -853,6 +857,19 @@ export class Text extends Sprite {
         if (this._singleCharRender !== value) {
             this._singleCharRender = value;
             this.markChanged();
+        }
+    }
+
+    /**
+     * caochangli - 是否运行时缓存文本ImageData。缓解文本字符串通过GPU转成纹理像素的性能开销 
+     */
+    get isRunTimeCache(): boolean {
+        return this._isRunTimeCache;
+    }
+
+    set isRunTimeCache(value: boolean) {
+        if (this._isRunTimeCache !== value) {
+            this._isRunTimeCache = value;
         }
     }
 
@@ -2336,6 +2353,7 @@ export class Text extends Sprite {
                         gcmd.bold = cmd.style.bold;
                         gcmd.italic = cmd.style.italic;
                         gcmd.singleCharRender = this._singleCharRender;
+                        gcmd.isRunTimeCache = this._isRunTimeCache;
                         gcmd._preMeasuredWidth = cmd.width;
                         graphics.addCmd(gcmd);
                     }
