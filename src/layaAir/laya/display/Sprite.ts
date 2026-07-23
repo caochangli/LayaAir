@@ -2319,6 +2319,7 @@ export class Sprite extends Node {
      */
     _processVisible(): boolean {
         let b = this._visible && !this._getBit(hiddenBits);
+        let changed = false;
         if (this._struct && this._struct.enabled !== b) {
             this._struct.enabled = b;
             if (b) {
@@ -2330,10 +2331,22 @@ export class Sprite extends Node {
             this.parentRepaint();
             this._checkSubRenderPass();
             this._refreshRenderPass();
-            return true;
+            changed = true;
         }
-        return false;
+
+        // caochangli - 自身或上层 visible 变化后，重算并传播子树的层级可见性
+        if ((this._bits & NodeFlags.HIERARCHY_VISIBLE_CHECK) !== 0) {
+            let parentVisible = !this._parent || this._parent.hierarchyVisible;
+            this._hierarchyVisibleChild(this, parentVisible);
+        }
+        return changed;
     }
+
+    /**caochangli - 本节点的局部可见性。 */
+    protected get _selfVisible(): boolean {
+        return this._visible && !this._getBit(hiddenBits);
+    }
+
 
     /**
      * @ignore

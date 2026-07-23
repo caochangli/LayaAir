@@ -17,7 +17,7 @@ import { StatElement } from "../layagl/StatisticsContext"
 
 const ARRAY_EMPTY: any[] = [];
 const initBits = NodeFlags.ACTIVE;
-const reactiveBits = NodeFlags.DISPLAY;
+const reactiveBits = NodeFlags.DISPLAY | NodeFlags.HIERARCHY_VISIBLE_CHECK;//caochangli
 
 type ChildType<T> = T extends Sprite3D ? Sprite3D
     : T extends GWidget ? GWidget
@@ -238,6 +238,31 @@ export class Node extends EventDispatcher {
             }
             this._setBit(NodeFlags.DISPLAYED_INSTAGE, displayedInStage);
         }
+
+        // caochangli - 计算节点层级可见性(考虑自身visible与祖先visible以及是否添加到舞台)
+        if ((bit & NodeFlags.HIERARCHY_VISIBLE_CHECK) !== 0) {
+            let ele: Node = this._parent;
+            let stage: Node = ILaya.stage;
+            let hierarchyVisible: boolean = this._selfVisible;
+            if (hierarchyVisible) {
+                while (ele) {
+                    if ((ele._bits & NodeFlags.HIERARCHY_VISIBLE_CHECK) !== 0) {
+                        hierarchyVisible = (ele._bits & NodeFlags.HIERARCHY_VISIBLE) !== 0;
+                        break;
+                    }
+                    if (!ele._selfVisible) {
+                        hierarchyVisible = false;
+                        break;
+                    }
+                    if (ele === stage) {
+                        hierarchyVisible = true;
+                        break;
+                    }
+                    ele = ele._parent;
+                }
+            }
+            this._setBit(NodeFlags.HIERARCHY_VISIBLE, hierarchyVisible);
+        }
     }
 
     /**
@@ -271,6 +296,11 @@ export class Node extends EventDispatcher {
         if ((type === Event.DISPLAY || type === Event.UNDISPLAY) && (this._bits & NodeFlags.DISPLAY) === 0) {
             this._setBitUp(NodeFlags.DISPLAY);
         }
+        // caochangli - 增加懒式层级可见性功能
+        else if ((type === Event.HIERARCHY_VISIBLE || type === Event.UNHIERARCHY_VISIBLE) && (this._bits & NodeFlags.HIERARCHY_VISIBLE_CHECK) === 0) {
+            this._setBitUp(NodeFlags.HIERARCHY_VISIBLE_CHECK);
+        }
+        // caochangli - 增加懒式层级可见性功能
     }
 
     /**
@@ -838,6 +868,13 @@ export class Node extends EventDispatcher {
                 if (value.displayedInStage)
                     this._displayChild(this, true);
             }
+            // caochangli - 增加懒式层级可见性功能
+            if ((this._bits & NodeFlags.HIERARCHY_VISIBLE_CHECK) !== 0) {
+                this._setBitUp(NodeFlags.HIERARCHY_VISIBLE_CHECK);
+                if (value.hierarchyVisible)
+                    this._hierarchyVisibleChild(this, true);
+            }
+            // caochangli - 增加懒式层级可见性功能
             value._childChanged(this);
         } else {
             this._onRemoved();
@@ -846,12 +883,62 @@ export class Node extends EventDispatcher {
             let p = this._parent;
             if ((this._bits & NodeFlags.DISPLAY) !== 0)
                 this._displayChild(this, false);
+            // caochangli - 增加懒式层级可见性功能
+            if ((this._bits & NodeFlags.HIERARCHY_VISIBLE_CHECK) !== 0)
+                this._hierarchyVisibleChild(this, false);
+            // caochangli - 增加懒式层级可见性功能
             this._parent = null;
             this._$parent = null;
             if (!p._destroyed)
                 p._childChanged(this);
         }
     }
+
+    /**caochangli - 表示节点在层级中是否可见(考虑自身visible与祖先visible以及是否添加到舞台) */
+    get hierarchyVisible(): boolean {
+        if ((this._bits & NodeFlags.HIERARCHY_VISIBLE_CHECK) === 0)
+            this._setBitUp(NodeFlags.HIERARCHY_VISIBLE_CHECK);
+        return (this._bits & NodeFlags.HIERARCHY_VISIBLE) !== 0;
+    }
+
+    /**caochangli - 自身节点可见性 */
+    protected get _selfVisible(): boolean {
+        return true;
+    }
+
+    /**caochangli - 设置节点层级可见性 */
+    private _setHierarchyVisible(visible: boolean): void {
+        if (((this._bits & NodeFlags.HIERARCHY_VISIBLE) !== 0) !== visible) {
+            this._setBit(NodeFlags.HIERARCHY_VISIBLE, visible);
+            if (visible)
+                this.event(Event.HIERARCHY_VISIBLE);
+            else
+                this.event(Event.UNHIERARCHY_VISIBLE);
+        }
+    }
+
+    /**
+     * caochangli - 设置指定节点对象的子对象的层级可见性
+     * @param node 节点
+     * @param parentVisible 父节点可见性
+     */
+    protected _hierarchyVisibleChild(node: Node, parentVisible: boolean): void {
+        let visible = parentVisible && node._selfVisible;
+        let old = (node._bits & NodeFlags.HIERARCHY_VISIBLE) !== 0;
+        node._setHierarchyVisible(visible);
+        //本节点没变 - 跳过子节点
+        if (old === visible) 
+            return;
+        for (let child of node._children) {
+            if ((child._bits & NodeFlags.HIERARCHY_VISIBLE_CHECK) === 0)
+                continue;
+            if (child._children.length > 0)
+                this._hierarchyVisibleChild(child, visible);
+            else
+                child._setHierarchyVisible(visible && child._selfVisible);
+        }
+    }
+
 
     /**
      * @en Indicates whether the node is displayed in the scene.

@@ -181,6 +181,14 @@ export class Event {
      * @zh 定义 `destroy` 事件对象的 `type` 属性值。- caochangli
      */
     static readonly DESTROY = "destroy";
+    /**
+     * @zh 定义 `节点层级可见` 事件对象的 `type` 属性值。- caochangli
+     */
+    static readonly HIERARCHY_VISIBLE = "hierarchyVisible";
+    /**
+     * @zh 定义 `节点层级不可见` 事件对象的 `type` 属性值。- caochangli
+     */
+    static readonly UNHIERARCHY_VISIBLE = "unhierarchyVisible";
 
     /**
      * @en Defines the value of the `type` property of an `error` event object.
