@@ -692,6 +692,8 @@ export class WebGraphicsBatch implements IBatch2DProvider {
             elementFlags[0] = 0;
             orderElements.length = 0;//caochangli - 清理排序后的渲染列表
             let rectX,rectY,rectWidth,rectHeight;
+            let onlyChangePos;//caochangli
+            let jLeft,jRight,jTop,jBottom;//caochangli
 
             for (let i = 1; i < cnt; i++) {
                 let element = elementArray[start + i];
@@ -725,7 +727,7 @@ export class WebGraphicsBatch implements IBatch2DProvider {
                 rectRightCache[i] = rectX + rectWidth;
                 rectBottomCache[i] = rectY + rectHeight;
             }
-            var onlyChangePos = false;//是否仅调整位置不合批
+            onlyChangePos = false;//是否仅调整位置不合批
             for (let i = 1; i < cnt; i++) {
                 let element = elementArray[start + i];
                 let group = elementFlags[i];
@@ -766,10 +768,14 @@ export class WebGraphicsBatch implements IBatch2DProvider {
                     }
 
                     //尝试向前移动
+                    jLeft = rectLeftCache[j];//caochangli - 减少数组访问次数
+                    jRight = rectRightCache[j];
+                    jTop = rectTopCache[j];
+                    jBottom = rectBottomCache[j];
                     for (let k = j - 1; k >= i; k--) {
                         if (elementFlags[k] !== -2
-                            && rectLeftCache[j] < rectRightCache[k] && rectRightCache[j] > rectLeftCache[k]
-                            && rectTopCache[j] < rectBottomCache[k] && rectBottomCache[j] > rectTopCache[k]) {
+                            && jLeft < rectRightCache[k] && jRight > rectLeftCache[k]
+                            && jTop < rectBottomCache[k] && jBottom > rectTopCache[k]) {
                             element2 = null;
                             break;
                         }
