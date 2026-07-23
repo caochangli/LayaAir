@@ -630,6 +630,13 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
     }
 
     protected _update(): void {
+
+        //caochangli - 所属节点层级可见性
+        let hierarchyVisible = this.owner && this.owner.hierarchyVisible;
+        // caochangli - 循环播放的spine，所属节点层级不可见，跳过update
+        if (this._loop && !hierarchyVisible)
+            return;
+
         this._timeKeeper.update();
         let state = this._state;
         let delta = this._timeKeeper.delta * this._playbackRate;
@@ -667,7 +674,9 @@ export class Spine2DRenderNode extends BaseRenderNode2D {
         }
 
         this.spineItem.render(currentPlayTime);
-        this.owner.repaint(RepaintFlag.UpdateRT);
+        // caochangli - 所属节点层级可见，才设置节点重绘
+        if (hierarchyVisible)
+            this.owner.repaint(RepaintFlag.UpdateRT);
     }
 
     private _flushExtSkin() {
