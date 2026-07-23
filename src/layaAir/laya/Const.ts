@@ -14,10 +14,10 @@ export class NodeFlags {
     static ACTIVE = 0x1;
     static ACTIVE_INHIERARCHY = 0x2;
     static AWAKED = 0x4;
-    //static ACTUAL_VISIBLE = 0x8;
+    static HIERARCHY_VISIBLE_CHECK = 0x8; //caochangli
     static DISPLAY = 0x10;
     static HAS_ZORDER = 0x20;
-    //static = 0x40;
+    static HIERARCHY_VISIBLE = 0x40; //caochangli
     static DISPLAYED_INSTAGE = 0x80;
     //static = 0x100;
     static CHECK_INPUT = 0x200;
