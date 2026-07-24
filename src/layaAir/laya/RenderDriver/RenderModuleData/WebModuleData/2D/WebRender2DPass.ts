@@ -284,6 +284,44 @@ export class WebRender2DPass implements IRender2DPass {
       this.repaint = false;
    }
 
+   /**
+    * @internal 内联渲染：由父 pass 的占位 element 触发，不调 _initRenderProcess（不切 RT、
+    * 不动 invert 矩阵、不设 context.passData），直接复用父 pass 已设的 render target。
+    * 独立子pass 专用，不进 passManager 调度。
+    */
+   inlineRender(context: IRenderContext2D): void {
+      if (!this.enable || !this.root || this.root.globalAlpha < 0.01) return;
+
+      if (this.repaint) {
+         this._structs.reset();
+         this._renderElements.length = 0;
+         for (let i = 0, n = this._batchProviders.length; i < n; i++) {
+            this._batchProviders[i]?.reset();
+         }
+         this._pStructs = this._structs;
+         this.cullAndSort(context, this.root);
+         this.fillRenderElements();
+         this._enableBatch && LayaEnv.isPlaying && this.batch();
+
+         WebRender2DPass.uploadBuffer();
+         context.drawRenderElementList(this._renderElements);
+      } else {
+         this._structs.indice.forEach(index => {
+            let list = this._structs.lists.get(index);
+            for (let i = 0, cnt = list.length; i < cnt; i++) {
+               let struct = list.elements[i];
+               struct._handleInterData();
+               struct.renderUpdate(context);
+            }
+         });
+
+         WebRender2DPass.uploadBuffer();
+         context.drawRenderElementList(this._renderElements);
+      }
+
+      this.repaint = false;
+   }
+
    private fillRenderElements(): void {
       this._elementGroups.length = 0;
       let groupStart: number = 0;
