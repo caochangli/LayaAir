@@ -45,6 +45,9 @@ import { Tween } from "../tween/Tween";
 // import { SEventSystem } from "../sgsExpand/event/SEventSystem";
 import { IAssetGroup, AssetGroup } from "../sgsExpand/loader/AssetGroup";
 import { Loader } from "../net/Loader";
+import { WebRender2DPass } from "../RenderDriver/RenderModuleData/WebModuleData/2D/WebRender2DPass";
+import { WebRenderStruct2D } from "../RenderDriver/RenderModuleData/WebModuleData/2D/WebRenderStruct2D";
+import { PlaceholderRenderElement2D } from "../RenderDriver/WebGLDriver/2DRenderPass/PlaceholderRenderElement2D";
 
 
 const hiddenBits = NodeFlags.NOT_IN_PAGE;
@@ -259,6 +262,10 @@ export class Sprite extends Node {
     _ownPostProcess: boolean = false;
     /** @internal 渲染真实spritet的pass，在启用后处理，cacheAsBitmap和mask的时候生效 */
     _oriRenderPass: IRender2DPass;
+    /** @internal 独立无 RT 子pass（independentPass 开启时创建），不进 passManager，由占位 element 内联触发 */
+    _independentSubPass: IRender2DPass;
+    /** @internal 独立 pass 子树根在父 pass 中的占位渲染元素 */
+    _independentPlaceholder: PlaceholderRenderElement2D;
     /** @internal 渲染真实sprite所需的rt大小 */
     _drawOriRT: RenderTexture2D;
     /** @internal 片，代替的结构 ，真正的结构划到了rt上 */
@@ -337,6 +344,9 @@ export class Sprite extends Node {
             }
             this._oriRenderPass.destroy();
             this._oriRenderPass = null;
+        }
+        if (this._independentSubPass) {
+            this._disposeIndependentPass();
         }
         if (this._subStructRender) {
             this._subStructRender.destroy();
@@ -1202,6 +1212,25 @@ export class Sprite extends Node {
 
     set stackingRoot(value: boolean) {
         this._struct.stackingRoot = value;
+    }
+
+    /**
+     * @en Whether this node is the root of an independent render pass. When enabled, this node
+     * and all its descendants render on a separate RT-less sub-pass triggered inline by the
+     * base pass at this node's z-position. Dirty state is isolated: per-frame animation inside
+     * the subtree only re-runs the sub-pass, not the base pass. The subtree is fully isolated
+     * (no mask/blend/batch interaction with outside nodes). Supports z-order interleaving.
+     * @zh 是否作为独立渲染 pass 的根。开启后本节点及全部子项渲染在独立的无 RT 子pass 上，
+     * 由基 pass 在本节点 z 位置内联触发。标脏隔离：子树内部逐帧动画只重算子pass，不波及基 pass。
+     * 子树完全隔离（不与外部节点 mask/blend/合批 交互），支持按 z 序穿插。
+     */
+    get independentPass(): boolean {
+        return !!this._independentSubPass;
+    }
+
+    set independentPass(value: boolean) {
+        if (!!this._independentSubPass === value) return;
+        this._applyIndependentPass(value);
     }
 
     /**
@@ -2408,6 +2437,66 @@ export class Sprite extends Node {
         this._oriRenderPass = subPass;
 
         subStruct.renderMatrix = this.globalTrans.getMatrix();
+    }
+
+    /** @internal 开启/关闭独立无 RT 子pass */
+    private _applyIndependentPass(enable: boolean): void {
+        if (enable) {
+            // 互斥校验：DRAW2RT 路径（mask/cacheAs/PostProcess）与无 RT 独立 pass 互斥
+            if (this._renderType & SpriteConst.DRAW2RT) {
+                throw new Error("independentPass is mutually exclusive with mask / cacheAs='bitmap' / postProcess on the same node");
+            }
+            // 嵌套校验：祖先链不得已有 independentPass 节点
+            let anc: Node = this._parent;
+            while (anc) {
+                if ((anc as Sprite)._independentSubPass) {
+                    throw new Error("independentPass cannot be nested under another independentPass node");
+                }
+                anc = anc._parent;
+            }
+
+            let basePass = ILaya.stage.passManager.basePass;
+            // 创建子pass：无 RT、不进 passManager
+            let subPass = LayaGL.render2DRenderPassFactory.createRender2DPass() as WebRender2DPass;
+            subPass.root = this._struct as WebRenderStruct2D;
+            subPass.renderTexture = null;
+            subPass.doClearColor = false;
+            subPass.enable = true;
+            this._independentSubPass = subPass;
+
+            // 创建占位 element 并赋给 struct
+            let placeholder = new PlaceholderRenderElement2D(subPass, this._struct as WebRenderStruct2D);
+            this._independentPlaceholder = placeholder;
+            (this._struct as WebRenderStruct2D).placeholderElement = placeholder;
+
+            // 归属切换前先标脏基 pass（占位即将入表）
+            (basePass as WebRender2DPass).repaint = true;
+            // 切换 struct.pass 到子pass，子项经 updateChildren(Pass) 自动继承
+            (this._struct as WebRenderStruct2D).pass = subPass;
+            // 子pass 首帧需重算
+            subPass.repaint = true;
+        } else {
+            this._disposeIndependentPass();
+        }
+    }
+
+    /** @internal 回收独立无 RT 子pass */
+    private _disposeIndependentPass(): void {
+        let subPass = this._independentSubPass as WebRender2DPass;
+        if (!subPass) return;
+
+        let basePass = ILaya.stage.passManager.basePass;
+        // 占位 struct 回归基 pass：先清占位 element，再切 pass
+        (this._struct as WebRenderStruct2D).placeholderElement = null;
+        (this._struct as WebRenderStruct2D).pass = null; // 回归继承父 pass（基 pass）
+        if (this._independentPlaceholder) {
+            this._independentPlaceholder.destroy();
+            this._independentPlaceholder = null;
+        }
+        subPass.destroy();
+        this._independentSubPass = null;
+        // 基 pass 需重排以移除占位、重收子树
+        (basePass as WebRender2DPass).repaint = true;
     }
 
     /** @internal */
