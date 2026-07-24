@@ -81,6 +81,9 @@ export class WebRenderStruct2D implements IRenderStruct2D {
    _effectZ: number = 0;
    stackingRoot = false;
 
+   /** @internal 独立 pass 子树根在父 pass 中的占位渲染元素；非独立 pass 根为 null */
+   placeholderElement: IRenderElement2D = null;
+
    rect: Rectangle = new Rectangle();
 
    private _enableCulling: boolean = false;

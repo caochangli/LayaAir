@@ -171,6 +171,13 @@ export class WebRender2DPass implements IRender2DPass {
       )
          return;
 
+      // 遇到属于其它独立 pass 的子树根：加入本 pass 排序列表（使其占位 element 被注入），
+      // 但跳过 renderUpdate 与子树递归，由其所属子pass 自行渲染子树内容。
+      if (struct !== this.root && struct.pass !== this && !struct.subStruct) {
+         this._pStructs.add(struct, struct._effectZ);
+         return;
+      }
+
       let renderStruct = (struct.subStruct && struct !== this.root) ? struct.subStruct : struct;
 
       renderStruct._handleInterData();
@@ -332,6 +339,13 @@ export class WebRender2DPass implements IRender2DPass {
          let list = this._structs.lists.get(index);
          for (let i = 0, cnt = list.length; i < cnt; i++) {
             let struct = list.elements[i];
+            // 独立 pass 子树根：只注入占位 element（绕过 geometry null 检查），
+            // 跳过该 struct 自身 renderElements 与 dcOptimize 逻辑（其图形属子pass）。
+            if (struct.placeholderElement) {
+               struct.placeholderElement._index = renderElements.length;
+               renderElements.add(struct.placeholderElement);
+               continue;
+            }
             let n = struct.renderElements ? struct.renderElements.length : 0;
             if (struct.owner._getBit(NodeFlags.HIDE_BY_EDITOR)) //Editor only code, native should ignore
                n = 0;
