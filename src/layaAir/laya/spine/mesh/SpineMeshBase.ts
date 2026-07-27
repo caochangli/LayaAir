@@ -92,6 +92,9 @@ export abstract class SpineMeshBase {
      */
     protected indexBufferLength: number = 0;
 
+    /**caochangli - 缓存 */
+    private _ibView:Uint16Array;
+
     /**
      * @en Create a new instance of SpineMeshBase.
      * @param material The material to use for this mesh.
@@ -163,7 +166,13 @@ export abstract class SpineMeshBase {
         }
 
         vb.setData(this.vertexArray.buffer, 0, this.vertexArray.byteOffset, vblen);
-        ib._setIndexData(new Uint16Array(this.indexArray.buffer, this.indexArray.byteOffset, iblen / 2), 0);
+        // ib._setIndexData(new Uint16Array(this.indexArray.buffer, this.indexArray.byteOffset, iblen / 2), 0);
+        // caochangli - 缓存
+        let ibCount = iblen / 2;
+        let ibView = this._ibView;
+        if (!ibView || ibView.buffer !== this.indexArray.buffer || ibView.byteOffset !== this.indexArray.byteOffset || ibView.length !== ibCount)
+            ibView = this._ibView = new Uint16Array(this.indexArray.buffer, this.indexArray.byteOffset, ibCount);
+        ib._setIndexData(ibView, 0);
 
         this.geo.clearRenderParams();
         this.geo.setDrawElemenParams(iblen / 2, 0);

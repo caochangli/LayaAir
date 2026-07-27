@@ -343,9 +343,10 @@ export class SpineSkeletonRenderer extends SpineNormalRenderBase implements ISpi
         let offsetX = -skeleton.x;
         let offsetY = -skeleton.y;
         let premultipliedAlpha = renderNode.premultipliedAlpha;
-
+        let isClipping = clipper.isClipping();//caochangli
+        let clippedVertexSize = isClipping ? 2 : vertexSize;//caochangli - 从循环中移出来
         for (let i = 0, n = drawOrder.length; i < n; i++) {
-            let clippedVertexSize = clipper.isClipping() ? 2 : vertexSize;
+            // let clippedVertexSize = clipper.isClipping() ? 2 : vertexSize;
             let slot = drawOrder[i];
             let boneOrSlot = this.templet.needSlot ? slot : slot.bone;
 
@@ -456,7 +457,8 @@ export class SpineSkeletonRenderer extends SpineNormalRenderBase implements ISpi
                     virtualMesh.clear();
                 }
 
-                if (clipper.isClipping()) {
+                // if (clipper.isClipping()) {
+                if (isClipping) {// caochangli
                     clipper.clipTriangles(renderable.vertices, renderable.numFloats, triangles, triangles.length, uvs, finalColor, darkColor, twoColorTint);
                     if (!virtualMesh.canAppend(clipper.clippedVertices.length, clipper.clippedTriangles.length)) {
                         virtualMesh.draw();

@@ -1,4 +1,5 @@
 import { IndexFormat } from "../../RenderEngine/RenderEnum/IndexFormat";
+import { ArrayPool } from "../../sgsExpand/pool/ArrayPool";
 import { SpineMeshBase } from "../mesh/SpineMeshBase";
 import { SpineMeshUtils } from "../mesh/SpineMeshUtils";
 import { AttachmentParse } from "./AttachmentParse";
@@ -124,7 +125,7 @@ export class IBCreator {
         let texture;
         let blend;
 
-        let uploadData: Array<{ offset: number, data: ArrayLike<number>, start: number }> = [];
+        let uploadData: Array<{ offset: number, data: ArrayLike<number>, start: number }> = ArrayPool.Get();//[];
         let end = -1;
         for (let i = 0, n = drawOrder.length; i < n; i++) {
             let attach = getAttach(drawOrder[i]);
@@ -193,5 +194,7 @@ export class IBCreator {
 
         this.outRenderData = outRenderData;
         this.ibLength = offset;
+
+        ArrayPool.Release(uploadData);//caochangli - 数组复用
     }
 }

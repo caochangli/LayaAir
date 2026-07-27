@@ -40,7 +40,8 @@ export class SpineTemplet extends Resource {
      * @en Map of materials used in the Spine animation
      * @zh Spine动画中使用的材质映射
      */
-    materialMap: Map<string, Material> = new Map();
+    // materialMap: Map<string, Material> = new Map();
+    materialMap: Map<number, Material> = new Map();//caochangli - key换成数值
 
     private _textures: Record<string, Texture2D>;
     private _atlas: spine.TextureAtlas;
@@ -150,7 +151,8 @@ export class SpineTemplet extends Resource {
             texture = Texture2D.whiteTexture;
         }
 
-        let key = texture.id + "_" + blendMode;
+        // let key = texture.id + "_" + blendMode;
+        let key = (texture.id << 8) | (blendMode & 0xFF);//caochangli - key换成数值
         let mat = this.materialMap.get(key);
         if (!mat) {
             mat = new Material();

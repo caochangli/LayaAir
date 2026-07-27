@@ -164,17 +164,21 @@ export class SpineShaderInit {
      */
     static changeVertexDefine(shaderData: ShaderData, mesh: Mesh2D) {
 
-        let hasTwoColor = false;
-
-        let vertexBuffers = mesh.vertexBuffers;
-        for (let i = 0; i < vertexBuffers.length; i++) {
-            let vertexBuffer = vertexBuffers[i];
-            let vertexDeclaration = vertexBuffer.vertexDeclaration;
-            let vertexElement = vertexDeclaration.getVertexElementByUsage(11);
-            if (vertexElement) {
-                hasTwoColor = true;
-                break
+        // caochangli - 将结果绑定到mesh上复用
+        let hasTwoColor = (mesh as any).__hasTwoColor;
+        if (hasTwoColor === undefined) {
+            hasTwoColor = false
+            let vertexBuffers = mesh.vertexBuffers;
+            for (let i = 0; i < vertexBuffers.length; i++) {
+                let vertexBuffer = vertexBuffers[i];
+                let vertexDeclaration = vertexBuffer.vertexDeclaration;
+                let vertexElement = vertexDeclaration.getVertexElementByUsage(11);
+                if (vertexElement) {
+                    hasTwoColor = true;
+                    break
+                }
             }
+            (mesh as any).__hasTwoColor = hasTwoColor;
         }
 
         if (hasTwoColor) {

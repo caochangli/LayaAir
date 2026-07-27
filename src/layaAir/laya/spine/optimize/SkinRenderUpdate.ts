@@ -134,7 +134,9 @@ export class SkinRenderUpdate {
             let frameData = skindata.getFrameData(f);
             let frameChanges = frameData.vChanges;
             if (frameChanges) {
-                for (const change of frameChanges) {
+                // for (const change of frameChanges) {
+                for (let c = 0, m = frameChanges.length; c < m; c++) {
+                    let change = frameChanges[c];
                     if (!currentChanges.includes(change)) {
                         currentChanges.push(change);
                     }
