@@ -3140,11 +3140,33 @@ var spine;
             this.worldY = pc * x + pd * y + parent.worldY;
             switch (this.data.transformMode) {
                 case spine.TransformMode.Normal: {
-                    let rotationY = rotation + 90 + shearY;
-                    let la = spine.MathUtils.cosDeg(rotation + shearX) * scaleX;
-                    let lb = spine.MathUtils.cosDeg(rotationY) * scaleY;
-                    let lc = spine.MathUtils.sinDeg(rotation + shearX) * scaleX;
-                    let ld = spine.MathUtils.sinDeg(rotationY) * scaleY;
+                    // let rotationY = rotation + 90 + shearY;
+                    // let la = spine.MathUtils.cosDeg(rotation + shearX) * scaleX;
+                    // let lb = spine.MathUtils.cosDeg(rotationY) * scaleY;
+                    // let lc = spine.MathUtils.sinDeg(rotation + shearX) * scaleX;
+                    // let ld = spine.MathUtils.sinDeg(rotationY) * scaleY;
+                    // this.a = pa * la + pb * lc;
+                    // this.b = pa * lb + pb * ld;
+                    // this.c = pc * la + pd * lc;
+                    // this.d = pc * lb + pd * ld;
+                    // return;
+
+                    // caochangli - 缓存值
+                    if (rotation !== this._cacheRotation || shearX !== this._cacheShearX ||
+                        shearY !== this._cacheShearY || scaleX !== this._cacheScaleX ||
+                        scaleY !== this._cacheScaleY) {
+                        let rotationY = rotation + 90 + shearY;
+                        this._la = spine.MathUtils.cosDeg(rotation + shearX) * scaleX;
+                        this._lb = spine.MathUtils.cosDeg(rotationY) * scaleY;
+                        this._lc = spine.MathUtils.sinDeg(rotation + shearX) * scaleX;
+                        this._ld = spine.MathUtils.sinDeg(rotationY) * scaleY;
+                        this._cacheRotation = rotation;
+                        this._cacheShearX = shearX;
+                        this._cacheShearY = shearY;
+                        this._cacheScaleX = scaleX;
+                        this._cacheScaleY = scaleY;
+                    }
+                    let la = this._la, lb = this._lb, lc = this._lc, ld = this._ld;
                     this.a = pa * la + pb * lc;
                     this.b = pa * lb + pb * ld;
                     this.c = pc * la + pd * lc;
@@ -3152,11 +3174,32 @@ var spine;
                     return;
                 }
                 case spine.TransformMode.OnlyTranslation: {
-                    let rotationY = rotation + 90 + shearY;
-                    this.a = spine.MathUtils.cosDeg(rotation + shearX) * scaleX;
-                    this.b = spine.MathUtils.cosDeg(rotationY) * scaleY;
-                    this.c = spine.MathUtils.sinDeg(rotation + shearX) * scaleX;
-                    this.d = spine.MathUtils.sinDeg(rotationY) * scaleY;
+                    // let rotationY = rotation + 90 + shearY;
+                    // this.a = spine.MathUtils.cosDeg(rotation + shearX) * scaleX;
+                    // this.b = spine.MathUtils.cosDeg(rotationY) * scaleY;
+                    // this.c = spine.MathUtils.sinDeg(rotation + shearX) * scaleX;
+                    // this.d = spine.MathUtils.sinDeg(rotationY) * scaleY;
+                    // break;
+
+                    // caochangli - 缓存值
+                    if (rotation !== this._cacheRotation || shearX !== this._cacheShearX ||
+                        shearY !== this._cacheShearY || scaleX !== this._cacheScaleX ||
+                        scaleY !== this._cacheScaleY) {
+                        let rotationY = rotation + 90 + shearY;
+                        this._la = spine.MathUtils.cosDeg(rotation + shearX) * scaleX;
+                        this._lb = spine.MathUtils.cosDeg(rotationY) * scaleY;
+                        this._lc = spine.MathUtils.sinDeg(rotation + shearX) * scaleX;
+                        this._ld = spine.MathUtils.sinDeg(rotationY) * scaleY;
+                        this._cacheRotation = rotation;
+                        this._cacheShearX = shearX;
+                        this._cacheShearY = shearY;
+                        this._cacheScaleX = scaleX;
+                        this._cacheScaleY = scaleY;
+                    }
+                    this.a = this._la;
+                    this.b = this._lb;
+                    this.c = this._lc;
+                    this.d = this._ld;
                     break;
                 }
                 case spine.TransformMode.NoRotationOrReflection: {
@@ -3230,6 +3273,9 @@ var spine;
             this.scaleY = data.scaleY;
             this.shearX = data.shearX;
             this.shearY = data.shearY;
+
+            // caochangli - 清理缓存
+            this._cacheRotation = this._cacheShearX = this._cacheShearY = this._cacheScaleX = this._cacheScaleY = undefined;
         }
         getWorldRotationX() {
             return Math.atan2(this.c, this.a) * spine.MathUtils.radDeg;
