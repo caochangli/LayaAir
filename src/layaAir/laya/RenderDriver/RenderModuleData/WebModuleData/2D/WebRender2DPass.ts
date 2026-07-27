@@ -171,13 +171,6 @@ export class WebRender2DPass implements IRender2DPass {
       )
          return;
 
-      // 遇到属于其它独立 pass 的子树根：加入本 pass 排序列表（使其占位 element 被注入），
-      // 但跳过 renderUpdate 与子树递归，由其所属子pass 自行渲染子树内容。
-      if (struct !== this.root && struct.pass !== this && !struct.subStruct) {
-         this._pStructs.add(struct, struct._effectZ);
-         return;
-      }
-
       let renderStruct = (struct.subStruct && struct !== this.root) ? struct.subStruct : struct;
 
       renderStruct._handleInterData();
@@ -291,44 +284,6 @@ export class WebRender2DPass implements IRender2DPass {
       this.repaint = false;
    }
 
-   /**
-    * @internal 内联渲染：由父 pass 的占位 element 触发，不调 _initRenderProcess（不切 RT、
-    * 不动 invert 矩阵、不设 context.passData），直接复用父 pass 已设的 render target。
-    * 独立子pass 专用，不进 passManager 调度。
-    */
-   inlineRender(context: IRenderContext2D): void {
-      if (!this.enable || !this.root || this.root.globalAlpha < 0.01) return;
-
-      if (this.repaint) {
-         this._structs.reset();
-         this._renderElements.length = 0;
-         for (let i = 0, n = this._batchProviders.length; i < n; i++) {
-            this._batchProviders[i]?.reset();
-         }
-         this._pStructs = this._structs;
-         this.cullAndSort(context, this.root);
-         this.fillRenderElements();
-         this._enableBatch && LayaEnv.isPlaying && this.batch();
-
-         WebRender2DPass.uploadBuffer();
-         context.drawRenderElementList(this._renderElements);
-      } else {
-         this._structs.indice.forEach(index => {
-            let list = this._structs.lists.get(index);
-            for (let i = 0, cnt = list.length; i < cnt; i++) {
-               let struct = list.elements[i];
-               struct._handleInterData();
-               struct.renderUpdate(context);
-            }
-         });
-
-         WebRender2DPass.uploadBuffer();
-         context.drawRenderElementList(this._renderElements);
-      }
-
-      this.repaint = false;
-   }
-
    private fillRenderElements(): void {
       this._elementGroups.length = 0;
       let groupStart: number = 0;
@@ -339,13 +294,6 @@ export class WebRender2DPass implements IRender2DPass {
          let list = this._structs.lists.get(index);
          for (let i = 0, cnt = list.length; i < cnt; i++) {
             let struct = list.elements[i];
-            // 独立 pass 子树根：只注入占位 element（绕过 geometry null 检查），
-            // 跳过该 struct 自身 renderElements 与 dcOptimize 逻辑（其图形属子pass）。
-            if (struct.placeholderElement) {
-               struct.placeholderElement._index = renderElements.length;
-               renderElements.add(struct.placeholderElement);
-               continue;
-            }
             let n = struct.renderElements ? struct.renderElements.length : 0;
             if (struct.owner._getBit(NodeFlags.HIDE_BY_EDITOR)) //Editor only code, native should ignore
                n = 0;
