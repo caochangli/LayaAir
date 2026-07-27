@@ -2004,7 +2004,7 @@ var spine;
                 let timelineCount = timelines.length;
                 if ((i == 0 && mix == 1) || blend == spine.MixBlend.add) {
                     for (let ii = 0; ii < timelineCount; ii++) {
-                        spine.Utils.webkit602BugfixHelper(mix, blend);
+                        // spine.Utils.webkit602BugfixHelper(mix, blend); //caochangli - 空方法注释
                         var timeline = timelines[ii];
                         if (timeline instanceof spine.AttachmentTimeline)
                             this.applyAttachmentTimeline(timeline, skeleton, applyTime, blend, true);
@@ -2027,7 +2027,7 @@ var spine;
                             this.applyAttachmentTimeline(timeline, skeleton, applyTime, blend, true);
                         }
                         else {
-                            spine.Utils.webkit602BugfixHelper(mix, blend);
+                            // spine.Utils.webkit602BugfixHelper(mix, blend); //caochangli - 空方法注释
                             timeline.apply(skeleton, animationLast, applyTime, applyEvents, mix, timelineBlend, spine.MixDirection.mixIn);
                         }
                     }
@@ -2124,7 +2124,7 @@ var spine;
                     else if (timeline instanceof spine.AttachmentTimeline)
                         this.applyAttachmentTimeline(timeline, skeleton, applyTime, timelineBlend, attachments);
                     else {
-                        spine.Utils.webkit602BugfixHelper(alpha, blend);
+                        // spine.Utils.webkit602BugfixHelper(alpha, blend);//caochangli - 空方法注释
                         if (drawOrder && timeline instanceof spine.DrawOrderTimeline && timelineBlend == spine.MixBlend.setup)
                             direction = spine.MixDirection.mixIn;
                         timeline.apply(skeleton, animationLast, applyTime, events, alpha, timelineBlend, direction);
@@ -7662,7 +7662,7 @@ var spine;
             return this.active;
         }
         update() {
-            if (this.mixRotate == 0 && this.mixX == 0 && this.mixY == 0 && this.mixScaleX == 0 && this.mixScaleX == 0 && this.mixShearY == 0)
+            if (this.mixRotate == 0 && this.mixX == 0 && this.mixY == 0 && this.mixScaleX == 0 && this.mixScaleY == 0 && this.mixShearY == 0)
                 return;
             if (this.data.local) {
                 if (this.data.relative)
