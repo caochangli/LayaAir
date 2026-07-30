@@ -381,10 +381,16 @@ class BatchContext {
 
         // 检查对象引用（指针比较，较快）
         if (this.subShader !== element.subShader ||
-            this.bufferState !== element.geometry.bufferState ||
+            // this.bufferState !== element.geometry.bufferState ||
             this.clipInfo !== elementOwner.getClipInfo() ||
             elementOwner.globalRenderData !== this.globalRenderData) {
             return 0;
+        }
+        //bufferState不一致可以调整位置
+        if (this.bufferState !== element.geometry.bufferState) {
+            if (!isRenderFlagSame)
+                return 0;
+            isDcMerg = false;
         }
 
         // 检查材质 自定义材质直接比对 shaderdata
@@ -541,10 +547,16 @@ class BatchContext {
 
         // 检查对象引用（指针比较，较快）
         if (this.subShader !== element.subShader ||
-            this.bufferState !== element.geometry.bufferState ||
+            // this.bufferState !== element.geometry.bufferState ||
             this.clipInfo !== elementOwner.getClipInfo() ||
             elementOwner.globalRenderData !== this.globalRenderData) {
             return 0;
+        }
+        //bufferState不一致可以调整位置
+        if (this.bufferState !== element.geometry.bufferState) {
+            if (!isRenderFlagSame)
+                return 0;
+            isDcMerg = false;
         }
 
         // 检查材质 自定义材质直接比对 shaderdata
