@@ -78,6 +78,12 @@ export interface IRenderStruct2D {
 
    pass: IRender2DPass;
 
+   /**caochangli - 独立pass子树根在父pass中的占位渲染元素；非独立pass根为 null */
+   aloneElement?: IRenderElement2D;
+
+   /**caochangli - 脏标屏障：独立 pass 子树根置 true，使 parentRepaint 在此止步，不波及 basePass */
+   dirtyBarrier?: boolean;
+
    setRepaint(): void;
 
    addChild(child: IRenderStruct2D, index: number): void;

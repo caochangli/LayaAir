@@ -26,6 +26,7 @@ import { IRenderStruct2D } from "../RenderDriver/RenderModuleData/Design/2D/IRen
 import { LayaGL } from "../layagl/LayaGL";
 import { ShaderData } from "../RenderDriver/DriverDesign/RenderDevice/ShaderData";
 import { IRender2DPass } from "../RenderDriver/RenderModuleData/Design/2D/IRender2DPass";
+import { IRenderElement2D } from "../RenderDriver/DriverDesign/2DRenderPass/IRenderElement2D";
 import { BlendMode, BlendModeHandler } from "../webgl/canvas/BlendMode";
 import { Stat } from "../utils/Stat";
 import { Scene } from "./Scene";
@@ -266,6 +267,11 @@ export class Sprite extends Node {
     /** @internal */
     _shaderData: ShaderData;
 
+    /** @internal caochangli - 独立无RT子pass(alonePass开启时创建)，不进passManager，由占位element内联触发 */
+    private _aloneSubPass: IRender2DPass;
+    /** @internal caochangli - 独立pass子树根在父pass中的占位渲染元素 */
+    private _aloneRenderElement2D: IRenderElement2D;
+
     /** @ignore */
     constructor() {
         super();
@@ -346,6 +352,9 @@ export class Sprite extends Node {
             this._graphicsRenderer.destroy();
             this._graphicsRenderer = null;
         }
+        // caochangli - 回收独立pass
+        if (this._aloneSubPass)
+            this._disposeAlonePass();
 
         if (this._drawOriRT) {
             if (this._drawOriRT !== RenderTexture2D._empty) {
@@ -1205,6 +1214,42 @@ export class Sprite extends Node {
     }
 
     /**
+     * caochangli - 是否作为独立pass渲染，开启后本节点及其子节点渲染在独立的无RT子pass上 (仅WebGL渲染支持)
+     * - 本节点不能使用 mask、cacheAs='bitmap'、postProcess，子节点可各自使用这些特性
+     * - 本节点自身最好是不放任何渲染内容的容器 (渲染内容放到子节点上)。
+     *   - 如：给spine节点设置alonePass，那 spine._update->repaint->parentRepaint 父节点 basePass或alonePass 重绘
+     *   - 此时：全局basePass或外层alonePass重绘了，没有起到alonePass不波及basePass或外层alonePass的效果
+     * -
+     * - 由所属pass在本节点z位置内联触发 (标脏隔离：子树内部变化只重制此pass，不波及basePass或外层alonePass)
+     * - 子树作为整体占一个z槽位，不与外部节点穿插，不与外部合批
+     * - 支持嵌套：子树内部可再开 alonePass，形成多层内联子pass
+    */
+    get alonePass(): boolean {
+        return !!this._aloneSubPass;
+    }
+
+    set alonePass(value: boolean) {
+        if (!!this._aloneSubPass === value) 
+            return;
+
+        // 未启用独立pass渲染
+        if (!LayaGL.enableAlonePass)
+            return;
+
+        // 仅WebGL驱动支持 - GLES/native的RTRender2DPass无TS侧cullAndSort/fillRenderElements(源码在C++层，无法修改)
+        if (!LayaGL.render2DRenderPassFactory.supportAlonePass)
+            return;
+
+        // 同一节点 - mask、cacheAs='bitmap'、postProcess 与 alonePass互斥
+        if (value && (this._renderType & SpriteConst.DRAW2RT)) {
+            console.warn("同一节点上：mask、cacheAs='bitmap'、postProcess 与 alonePass互斥");
+            value = false;
+        }
+
+        this._applyAlonePass(value);
+    }
+
+    /**
      * @en Re-sort by zOrder.
      * @zh 根据 zOrder 进行重新排序。
      */
@@ -1730,6 +1775,11 @@ export class Sprite extends Node {
         const updateSprites = function (sprite: Sprite): void {
             if (!sprite._struct || !sprite._struct.enabled)
                 return;
+
+            // caochangli - 独立pass
+            if (sprite._aloneSubPass)
+                sprite._aloneSubPass.repaint = true;
+
             if (sprite._subpassUpdateFlag) {
                 sprite.updateSubRenderPassState();
                 if (sprite._oriRenderPass) {
@@ -2213,6 +2263,9 @@ export class Sprite extends Node {
             }
             else pStruct.setRepaint();
 
+            // caochangli - 脏标屏障：独立pass子树根置dirtyBarrier使子树内部脏标止于此，
+            // 不再上溯到basePass(子树内部动画只重算子pass)
+            if (pStruct.dirtyBarrier) return;
         }
     }
 
@@ -2410,6 +2463,59 @@ export class Sprite extends Node {
         subStruct.renderMatrix = this.globalTrans.getMatrix();
     }
 
+    /** caochangli - 开启&关闭独立无RT子pass */
+    private _applyAlonePass(enable: boolean): void {
+        if (enable) {
+            // 当前所属pass
+            let parentPass = this._struct.pass;
+
+            // 创建子pass：无RT、不进passManager
+            let subPass = LayaGL.render2DRenderPassFactory.createRender2DPass();
+            this._aloneSubPass = subPass;
+            subPass.root = this._struct;
+            subPass.renderTexture = null;
+            subPass.doClearColor = false;
+            subPass.enable = true;
+            
+            // 创建占位element并赋给struct，置脏标屏障
+            let placeholder = LayaGL.render2DRenderPassFactory.createAloneRenderElement2D(subPass, this._struct);
+            this._aloneRenderElement2D = placeholder;
+            this._struct.aloneElement = placeholder;
+            this._struct.dirtyBarrier = true;
+            // 切换 struct.pass 到子pass，子项经 updateChildren(Pass) 自动继承
+            this._struct.pass = subPass;
+            // 子pass首帧需重绘
+            subPass.repaint = true;
+            // 父pass标记重绘（注入占位、移除本子树原内容）
+            if (parentPass)
+                parentPass.repaint = true;
+        } else {
+            this._disposeAlonePass();
+        }
+    }
+
+    /** caochangli - 回收独立无RT子pass */
+    private _disposeAlonePass(): void {
+        let subPass = this._aloneSubPass;
+        if (!subPass) return;
+
+        this._struct.aloneElement = null;
+        this._struct.dirtyBarrier = false;
+        this._struct.pass = null; // 回归继承父 pass
+        if (this._aloneRenderElement2D) {
+            this._aloneRenderElement2D.destroy();
+            this._aloneRenderElement2D = null;
+        }
+        subPass.destroy();
+        this._aloneSubPass = null;
+
+        // 回归后所属 pass 需重绘（移除占位、重收子树）。
+        // 此时 struct.pass 已回归父 pass（嵌套场景下为上层独立子pass，顶层为 basePass）。
+        let parentPass = this._struct.pass;
+        if (parentPass)
+            parentPass.repaint = true;
+    }
+
     /** @internal */
     updateRenderTexture() {
         //计算方式调整
@@ -2537,6 +2643,11 @@ export class Sprite extends Node {
         }
 
         if (enable && !this._oriRenderPass.enable) {
+
+            // caochangli - 节点变为 DRAW2RT(RT子pass) 与 alonePass(无RT内联子pass) 互斥
+            if (this._aloneSubPass)
+                this._disposeAlonePass();
+
             this._struct.pass = this._oriRenderPass;
             this._struct.subStruct = this._subStruct;
             this._subStruct.enabled = true;

@@ -353,6 +353,12 @@ export class WebRenderStruct2D implements IRenderStruct2D {
       }
    }
 
+   /**caochangli -  独立 pass 子树根在父 pass 中的占位渲染元素；非独立 pass 根为 null */
+   aloneElement: IRenderElement2D;
+
+   /**caochangli - 脏标屏障：独立 pass 子树根置 true，使 parentRepaint 在此止步，不波及 basePass */
+   dirtyBarrier: boolean;
+
    constructor() {
    }
 
@@ -651,8 +657,9 @@ export class WebRenderStruct2D implements IRenderStruct2D {
    }
 
    setRepaint(): void {
-      if (this.pass) {
-         this.pass.repaint = true;
+      let pass = this.pass;
+      if (pass) {
+         pass.repaint = true;
       }
    }
 
@@ -728,6 +735,8 @@ export class WebRenderStruct2D implements IRenderStruct2D {
       this._parentData = null;
       this._clipRect = null;
       this.renderElements = null;
+      this.aloneElement = null;//caochangli
+      this.dirtyBarrier = null;//caochangli
       this.spriteShaderData = null;
       this.parent = null;
       this.children.length = 0;

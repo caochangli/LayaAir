@@ -17,8 +17,13 @@ import { WebGLBlit2DQuadCMD, WebGLDraw2DElementCMD, WebGLSetRendertarget2DCMD } 
 import { WebGLPrimitiveRenderElement2D } from "./WebGLPrimitiveRenderElement2D";
 import { WebglRenderContext2D } from "./WebGLRenderContext2D";
 import { WebGLRenderElement2D } from "./WebGLRenderElement2D";
+import { AloneRenderElement2D } from "./AloneRenderElement2D";
+import { IRenderStruct2D } from "../../RenderModuleData/Design/2D/IRenderStruct2D";
 
 export class WebGLRender2DProcess implements I2DRenderPassFactory {
+
+    /** caochangli - WebGL 驱动支持 alonePass */
+    readonly supportAlonePass: boolean = true;
 
     constructor() {
 
@@ -109,6 +114,11 @@ export class WebGLRender2DProcess implements I2DRenderPassFactory {
 
     createRenderStruct2D(): any {
         return new WebRenderStruct2D();
+    }
+
+    /**caochangli - 创建独立pass占位渲染元素（同 bundle 内 import） */
+    createAloneRenderElement2D(subPass: IRender2DPass, owner: IRenderStruct2D): IRenderElement2D {
+        return new AloneRenderElement2D(subPass as WebRender2DPass, owner as WebRenderStruct2D);
     }
 }
 

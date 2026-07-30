@@ -24,6 +24,9 @@ export class LayaGL {
 
     /**启用spine元素renderFlag字段 - 对设置了renderFlag标记的spine元素，在即便不能合批的情况下，通过调整渲染顺序达到不打断后续元素合批 */
     static enableSpineRenderFlag:boolean = true;
+
+    /**启用独立pass渲染 - 对设置了alonePass的Sprite节点采用独立pass渲染，从而降低basePass重绘压力 */
+    static enableAlonePass:boolean = true;
     
 //#endregion 新增renderFlag字段使用开关
 

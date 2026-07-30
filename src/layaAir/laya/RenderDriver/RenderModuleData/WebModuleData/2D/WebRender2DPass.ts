@@ -171,6 +171,17 @@ export class WebRender2DPass implements IRender2DPass {
       )
          return;
 
+      // caochangli - 遇到独立pass子树根：仍需 _handleInterData + renderUpdate 维护其继承数据
+      // (clip/alpha/blend 等，子树 struct 经 _currentData/_parentData 读取)
+      // 使 base 重绘分支与非重绘分支(_replayCachedStructs)对占位 struct 的处理一致
+      // 但不递归子树——子树内容由其所属子pass 自行渲染
+      if (struct.aloneElement && struct !== this.root) {
+         struct._handleInterData();
+         struct.renderUpdate(context2D);
+         this._pStructs.add(struct, struct._effectZ);
+         return;
+      }
+
       let renderStruct = (struct.subStruct && struct !== this.root) ? struct.subStruct : struct;
 
       renderStruct._handleInterData();
@@ -268,14 +279,63 @@ export class WebRender2DPass implements IRender2DPass {
             this.postProcess.apply();
          }
       } else {
-         this._structs.indice.forEach(index => {
-            let list = this._structs.lists.get(index);
-            for (let i = 0, cnt = list.length; i < cnt; i++) {
-               let struct = list.elements[i];
-               struct._handleInterData();
-               struct.renderUpdate(context);
-            }
-         });
+         // this._structs.indice.forEach(index => {
+         //    let list = this._structs.lists.get(index);
+         //    for (let i = 0, cnt = list.length; i < cnt; i++) {
+         //       let struct = list.elements[i];
+         //       struct._handleInterData();
+         //       struct.renderUpdate(context);
+         //    }
+         // });
+         // caochangli - 提取共用方法
+         this._replayStructRender(context);
+
+         WebRender2DPass.uploadBuffer();
+         context.drawRenderElementList(this._renderElements);
+      }
+
+      this.repaint = false;
+   }
+
+   /**
+    * caochangli - 复用struct列表：仅重跑 _handleInterData + renderUpdate
+    * - 不重排/重合批，fowardRender 和 inlineRender 的非重绘分支共用
+    */
+   private _replayStructRender(context: IRenderContext2D): void {
+      this._structs.indice.forEach(index => {
+         let list = this._structs.lists.get(index);
+         for (let i = 0, cnt = list.length; i < cnt; i++) {
+            let struct = list.elements[i];
+            struct._handleInterData();
+            struct.renderUpdate(context);
+         }
+      });
+   }
+
+   /**
+    * caochangli - 内联渲染：由父pass的占位element._render触发。
+    * 不调_initRenderProcess(不切 RT、不动 invert 矩阵、不设 context.passData)，直接复用父pass已设的render target与passData
+    */
+   inlineRender(context: IRenderContext2D): void {
+      if (!this.enable || !this.root || !this.root.enabled || this.root.globalAlpha < 0.01)
+         return;
+
+      if (this.repaint) {
+         this._structs.reset();
+         this._renderElements.length = 0;
+         for (let i = 0, n = this._batchProviders.length; i < n; i++) {
+            this._batchProviders[i]?.reset();
+         }
+
+         this._pStructs = this._structs;
+         this.cullAndSort(context, this.root);
+         this.fillRenderElements();
+         this._enableBatch && LayaEnv.isPlaying && this.batch();
+
+         WebRender2DPass.uploadBuffer();
+         context.drawRenderElementList(this._renderElements);
+      } else {
+         this._replayStructRender(context);
 
          WebRender2DPass.uploadBuffer();
          context.drawRenderElementList(this._renderElements);
@@ -294,6 +354,18 @@ export class WebRender2DPass implements IRender2DPass {
          let list = this._structs.lists.get(index);
          for (let i = 0, cnt = list.length; i < cnt; i++) {
             let struct = list.elements[i];
+            
+            // caochangli - 独立pass子树根：只注入占位element（绕过 geometry null 检查），
+            // 跳过该 struct 自身 renderElements 与 dcOptimize 逻辑——其图形属子pass。
+            // 注意：subPass 渲染自身子树时，root 自身的 placeholderElement 必须跳过——
+            // 该 placeholder 是为父 pass 注入用的，若注入到 subPass 自己的列表会导致
+            // drawRenderElementList → placeholder._render → inlineRender 自递归（死循环）。
+            if (struct.aloneElement && struct !== this.root) {
+               struct.aloneElement._index = renderElements.length;
+               renderElements.add(struct.aloneElement);
+               continue;
+            }
+
             let n = struct.renderElements ? struct.renderElements.length : 0;
             if (struct.owner._getBit(NodeFlags.HIDE_BY_EDITOR)) //Editor only code, native should ignore
                n = 0;
