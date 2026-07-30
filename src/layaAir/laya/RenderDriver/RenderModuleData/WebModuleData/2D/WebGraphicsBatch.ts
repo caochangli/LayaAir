@@ -347,7 +347,7 @@ class BatchContext {
             return 0;
         }
 
-        // 是否可以cd合批
+        // 是否可以dc合批
         let isDcMerg = true;
 
         // 渲染标记
@@ -507,7 +507,7 @@ class BatchContext {
             return 0;
         }
 
-        // 是否可以cd合批
+        // 是否可以dc合批
         let isDcMerg = true;
 
         // 渲染标记
@@ -684,16 +684,18 @@ export class WebGraphicsBatch implements IBatch2DProvider {
 
             if (elementFlags == null)
                 initCache(1000);
-
+            // elementFlags - 元素标记：初始-1 已换位置-2 组号>=0(不能合批元素递增)
             let headGroup = 0;
             let maxGroup = 1;
             let indiceLen = 1;
             elementIndice[0] = start;
             elementFlags[0] = 0;
-            orderElements.length = 0;//caochangli - 清理排序后的渲染列表
-            let rectX,rectY,rectWidth,rectHeight;
-            let onlyChangePos;//caochangli
+            let rectX,rectY,rectWidth,rectHeight;//caochangli
             let jLeft,jRight,jTop,jBottom;//caochangli
+            /**caochangli - 本组标记 0未定&单元素 1可调整位置 2可调整位置且合批 */
+            let groupFlag = 0;
+            groupFlags.length = 0;//caochangli - 清理组别标记列表
+            orderElements.length = 0;//caochangli - 清理排序后的渲染列表
 
             for (let i = 1; i < cnt; i++) {
                 let element = elementArray[start + i];
@@ -727,7 +729,7 @@ export class WebGraphicsBatch implements IBatch2DProvider {
                 rectRightCache[i] = rectX + rectWidth;
                 rectBottomCache[i] = rectY + rectHeight;
             }
-            onlyChangePos = false;//是否仅调整位置不合批
+
             for (let i = 1; i < cnt; i++) {
                 let element = elementArray[start + i];
                 let group = elementFlags[i];
@@ -735,14 +737,22 @@ export class WebGraphicsBatch implements IBatch2DProvider {
                     continue;
                 }
 
-                if (group !== -1) {
+                if (group !== -1) { //已设置过组
                     if (group === headGroup) {
+                        // caochangli - 同组元素：用groupFlags还原本组标记(出现1锁1，否则记2)
+                        let g = groupFlags[headGroup];
+                        if (g === 1) groupFlag = 1;
+                        else if (groupFlag !== 1) groupFlag = g || 2;
+
                         elementIndice[indiceLen++] = start + i;
                         continue;
                     }
                 }
                 else {
-                    if (ctx.isCompatible(element)) {
+                    if (ctx.isCompatible(element)) { //可合批
+                        // caochangli - 组标记
+                        if (groupFlag !== 1) groupFlag = 2;
+
                         elementIndice[indiceLen++] = start + i;
                         continue;
                     }
@@ -752,19 +762,26 @@ export class WebGraphicsBatch implements IBatch2DProvider {
 
                 for (let j = i + 1; j < cnt; j++) {
                     let element2 = elementArray[start + j];
-                    if (elementFlags[j] !== -1) {
+                    if (elementFlags[j] !== -1) { //已设置过组
                         if (elementFlags[j] !== headGroup)
                             continue;
+
+                        // caochangli - 同组元素：用groupFlags还原本组标记(出现1锁1，否则记2)
+                        let g = groupFlags[headGroup];
+                        if (g === 1) groupFlag = 1;
+                        else if (groupFlag !== 1) groupFlag = g || 2;
                     }
                     else {
-                        // if (!ctx.isCompatible(element2)) 
+                        // if (!ctx.isCompatible(element2))
                         //     continue;
                         // caochangli - 使用考虑renderFlag的方法
                         let compatible = ctx.isCompatible2(element2);
                         if (compatible == 0)//不能调换位置
                             continue;
-                        else if (compatible == 1)//可调整位置
-                            onlyChangePos = true;
+
+                        // caochangli - 可合批或仅可调位置，组标记(出现1锁1，否则记2)
+                        if (compatible === 1) groupFlag = 1;
+                        else if (groupFlag !== 1) groupFlag = 2;
                     }
 
                     //尝试向前移动
@@ -781,27 +798,29 @@ export class WebGraphicsBatch implements IBatch2DProvider {
                         }
                     }
 
-                    if (element2 != null) {
+                    if (element2 != null) { //向前移动
                         elementIndice[indiceLen++] = start + j;
                         elementFlags[j] = -2;
                     }
-                    else if (ctx.textureId !== 0)
+                    else if (groupFlag != 0 && ctx.textureId !== 0) { //位置重叠不移动 - 合批(2)与仅调整位置(1)均打组别标记
                         elementFlags[j] = headGroup;
+                        groupFlags[headGroup] = groupFlag;
+                    }
                 }
                 //caochangli - 先保存到排序后的渲染数组中，避免中途修改原数组，后续又用到原数组数据
                 var indiceEnd = indiceLen - 1;
-                if (!onlyChangePos) {//原合并dc
+                if (groupFlag == 2) {//原合批逻辑
                     // list.add(this.merge(elementArray, 0, indiceEnd, ctx, elementIndice));
                     orderElements.push(this.merge(elementArray, 0, indiceEnd, ctx, elementIndice));
                 }
-                else {//仅调整位置
+                else {//仅调整位置 - 分开处理
                     for (var m = 0; m <= indiceEnd; m++) {
                         // list.add(this.merge(elementArray, m, m, ctx, elementIndice));
                         orderElements.push(this.merge(elementArray, m, m, ctx, elementIndice));
                     }
                 }
-                onlyChangePos = false;
                 indiceLen = 1;
+                groupFlag = 0;//caochangli - 重置本组标记(0未定&单元素)
                 elementIndice[0] = start + i;
                 headGroup = group;
                 ctx.setHead(element);
@@ -935,6 +954,8 @@ var rectLeftCache: Float32Array;
 var rectTopCache: Float32Array;
 var rectRightCache: Float32Array;
 var rectBottomCache: Float32Array;
+/**caochangli - 组别标记列表 */
+var groupFlags:Array<number>;
 /**caochangli - 排序后的渲染列表 */
 var orderElements: Array<IPrimitiveRenderElement2D>;
 function initCache(maxElements: number) {
@@ -944,5 +965,6 @@ function initCache(maxElements: number) {
     rectTopCache = new Float32Array(maxElements);
     rectRightCache = new Float32Array(maxElements);
     rectBottomCache = new Float32Array(maxElements);
+    groupFlags = [];
     orderElements = [];
 }
