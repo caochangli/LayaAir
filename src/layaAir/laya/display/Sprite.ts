@@ -1049,8 +1049,11 @@ export class Sprite extends Node {
         return this._struct.dcOptimize;
     }
 
-    /**caochangli - 增加渲染标记(用于列表中且drawCallOptimize=true是远程资源打断后续元素合批问题) */
     private _renderFlag:string = "";
+    /**caochangli - 增加渲染标记
+     * - 用于drawCallOptimize=true的列表中，因单图、spine节点不能合批不调整位置，从而打断后续能合批节点的合批问题
+     * - 在在需要调整渲染顺序的单图、spine节点上设置（spine尺寸可通过设置较小的size来规避位置重叠问题）
+     * - 注意：”图集、文本“节点不需要设置 */
     public set renderFlag(value:string)
     {
         if (value == null) value = "";
@@ -1214,15 +1217,17 @@ export class Sprite extends Node {
     }
 
     /**
-     * caochangli - 是否作为独立pass渲染，开启后本节点及其子节点渲染在独立的无RT子pass上 (仅WebGL渲染支持)
-     * - 本节点不能使用 mask、cacheAs='bitmap'、postProcess，子节点可各自使用这些特性
-     * - 本节点自身最好是不放任何渲染内容的容器 (渲染内容放到子节点上)。
-     *   - 如：给spine节点设置alonePass，那 spine._update->repaint->parentRepaint 父节点 basePass或alonePass 重绘
-     *   - 此时：全局basePass或外层alonePass重绘了，没有起到alonePass不波及basePass或外层alonePass的效果
-     * -
-     * - 由所属pass在本节点z位置内联触发 (标脏隔离：子树内部变化只重制此pass，不波及basePass或外层alonePass)
-     * - 子树作为整体占一个z槽位，不与外部节点穿插，不与外部合批
-     * - 支持嵌套：子树内部可再开 alonePass，形成多层内联子pass
+     * caochangli - 是否作为独立pass渲染，开启后本节点以及子节点包含的渲染元素都在独立的pass中渲染 (仅WebGL渲染支持)
+     * - 独立pass中元素变更只会导致本独立pass重绘，不会导致stage总pass重绘（动静分离机制，缓解stage总pass重绘压力）
+     * - 注意：
+     *     - 1. 开启独立pass的节点需是不带任何渲染内容的容器节点（渲染内容放到子节点上）
+     *        - 如给spine节点设置alonePass，那 spine._update->repaint->parentRepaint 父节点 basePass或alonePass 重绘
+     *        - 全局basePass或外层alonePass重绘了，没有起到alonePass不波及basePass或外层alonePass的效果
+     *     - 2. 开启独立pass的节点不能使用”mask、cacheAs='bitmap'、postProcess”
+     * - 运行原理：
+     *     - 由所属pass在本节点z位置内联触发 (标脏隔离：子树内部变化只重制此pass，不波及basePass或外层alonePass)
+     *     - 子树作为整体占一个z槽位，不与外部节点穿插，不与外部合批
+     *     - 支持嵌套：子树内部可再开 alonePass，形成多层内联子pass
     */
     get alonePass(): boolean {
         return !!this._aloneSubPass;
