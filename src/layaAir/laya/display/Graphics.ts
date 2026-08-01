@@ -281,7 +281,7 @@ export class Graphics {
      * @param recover （可选）是否回收旧命令。默认为false。
      */
     replaceCmd<T extends IGraphicsCmd>(oldCmd: IGraphicsCmd, newCmd: T, recover?: boolean): T {
-        let index = this._cmds.indexOf(oldCmd);
+        let index = oldCmd ? this._cmds.indexOf(oldCmd) : -1;//caochangli - 增加oldCmd空判断
         
         if (oldCmd && oldCmd.needsLayoutRepaint) {
             this._layoutRepaintCount -= oldCmd.needsLayoutRepaint();

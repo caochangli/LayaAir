@@ -334,8 +334,12 @@ export class SpriteGlobalTransform {
      * @param notify 是否通知。
      */
     _setFlag(type: number, value: boolean, notify = true): void {
-        if (value)
+        if (value) {
+            // caochangli - 目标位已标脏，省去后续的执行
+            if ((this._flags & type) === type) 
+                return;
             this._flags |= type;
+        }
         else
             this._flags &= ~type;
 

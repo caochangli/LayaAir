@@ -984,7 +984,9 @@ export class Sprite extends Node {
     /** @internal */
     _needUpdateSubpass(): boolean {
         let sprite = this._maskParent || this;
-        return sprite.displayedInStage && sprite._struct.enabled;
+        // return sprite.displayedInStage && sprite._struct.enabled;
+        // caochangli - 先判断开销低的条件
+        return sprite._struct.enabled && sprite.displayedInStage;
     }
 
     /**
@@ -2695,12 +2697,20 @@ export class Sprite extends Node {
     }
 
     private _checkSubRenderPass() {
-        if (this._needUpdateSubpass()) {
-            if (this._subpassUpdateFlag || (this._renderType & SpriteConst.DRAW2RT && !this._drawOriRT)) {
+        // if (this._needUpdateSubpass()) {
+        //     if (this._subpassUpdateFlag || (this._renderType & SpriteConst.DRAW2RT && !this._drawOriRT)) {
+        //         this.setSubpassFlag(SubPassFlag.RenderTexture);
+        //     }
+        // } else if (this._subpassUpdateFlag) {
+        //     ILaya.stage._subpassUpdateList.delete(this);
+        // }
+        // caochangli - 先判断开销低的条件
+        if (this._subpassUpdateFlag || (this._renderType & SpriteConst.DRAW2RT && !this._drawOriRT)) {
+            if (this._needUpdateSubpass()) {
                 this.setSubpassFlag(SubPassFlag.RenderTexture);
+            } else if (this._subpassUpdateFlag) {
+                ILaya.stage._subpassUpdateList.delete(this);
             }
-        } else if (this._subpassUpdateFlag) {
-            ILaya.stage._subpassUpdateList.delete(this);
         }
 
         if (this._mask) {
@@ -2711,7 +2721,9 @@ export class Sprite extends Node {
     private _refreshRenderPass() {
 
         if (this._oriRenderPass) {
-            let result = this._needUpdateSubpass() && this._oriRenderPass.enable && this._renderType & SpriteConst.DRAW2RT;
+            // let result = this._needUpdateSubpass() && this._oriRenderPass.enable && this._renderType & SpriteConst.DRAW2RT;
+            // caochangli - 先判断开销低的条件
+            let result = this._oriRenderPass.enable && (this._renderType & SpriteConst.DRAW2RT) && this._needUpdateSubpass();
             if (result) {
                 ILaya.stage.passManager.addPass(this._oriRenderPass);
             }
