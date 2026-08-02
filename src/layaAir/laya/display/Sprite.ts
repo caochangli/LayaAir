@@ -1548,6 +1548,8 @@ export class Sprite extends Node {
         }
         return this;
     }
+    /** @internal caochangli - 反序列化期间跳过 _spTransChanged 的 _syncFlag 递归（节点全局缓存初始即全脏，递归标脏为空转）*/
+    _skipSyncFlag: boolean = false;
 
     /**
      * @zh Transform改变时的通知，包括坐标，尺寸等，详见TransChangeType定义。

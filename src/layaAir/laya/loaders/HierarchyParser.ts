@@ -13,7 +13,7 @@ import { Utils } from "../utils/Utils";
 import { ObjDecoder } from "./ObjDecoder";
 import { SerializeUtil } from "./SerializeUtil";
 
-const excludeKeys = new Set(["x", "y", "width", "height", "controllers", "relations", "gears"]);
+const excludeKeys = new Set(["x", "y", "width", "height", "scaleX", "scaleY", "controllers", "relations", "gears"]);//caochangli - 增加缩放合并
 
 export class HierarchyParser {
 
@@ -346,6 +346,10 @@ export class HierarchyParser {
             let nodeData = dataList[i];
             let node = allNodes[i];
 
+            // caochangli - 反序列化期间跳过 _syncFlag 递归：节点全局缓存初始全脏，递归标脏为空转
+            if (node) 
+                (<Sprite>node)._skipSyncFlag = true;
+
             let children: Array<any> = nodeData._$child;
             if (children) {
                 let num = children.length;
@@ -463,8 +467,15 @@ export class HierarchyParser {
         for (let i = 0; i < nodeCnt; i++) {
             let nodeData = dataList[i];
             let node = <Sprite>allNodes[i];
-            if (node && (node._nodeType === 2 || node === scene))
-                decoder.decodeObjBounds(nodeData, node);
+            // if (node && (node._nodeType === 2 || node === scene))
+            //     decoder.decodeObjBounds(nodeData, node);
+            if (node) {
+                if (node._nodeType === 2 || node === scene)
+                    decoder.decodeObjBounds(nodeData, node);
+
+                // caochangli - 该节点 round1 处理完毕，恢复 _syncFlag 递归（父节点 round1 处理时仍会跳过自己的递归）
+                node._skipSyncFlag = false;
+            }
         }
 
         if (hasUI) {

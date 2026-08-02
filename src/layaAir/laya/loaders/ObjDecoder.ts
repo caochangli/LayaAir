@@ -53,6 +53,16 @@ export class ObjDecoder {
             else if (v1 !== undefined)
                 obj.height = v1;
 
+            // caochangli - 增加缩放合批
+            v0 = data["scaleX"];
+            v1 = data["scaleY"];
+            if (v0 !== undefined && v1 !== undefined)
+                obj.scale(v0, v1);
+            else if (v0 !== undefined)
+                obj.scaleX = v0;
+            else if (v1 !== undefined)
+                obj.scaleY = v1;
+
             v0 = data["controllers"];
             if (v0 !== undefined)
                 (<GWidget>obj).controllers = this._decode(v0);
