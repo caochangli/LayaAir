@@ -336,8 +336,11 @@ export class SpriteGlobalTransform {
     _setFlag(type: number, value: boolean, notify = true): void {
         if (value) {
             // caochangli - 目标位已标脏，省去后续的执行
-            if ((this._flags & type) === type) 
+            if ((this._flags & type) === type) {
+                if (notify)
+                    this._notifyRenderSpriteTransChange();
                 return;
+            }
             this._flags |= type;
         }
         else
