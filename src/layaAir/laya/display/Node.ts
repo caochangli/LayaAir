@@ -365,8 +365,10 @@ export class Node extends EventDispatcher {
             return;
 
         this._destroyed = true;
-
-        // caochangli - 增加节点销毁事件
+        this.destroyAllComponent();
+        this._parent && this._parent._removeChild(this);
+        
+         // caochangli - 增加节点销毁事件(保证外层节点和内层节点都是先触发remove事件再触发destroy事件)
         this.event(Event.DESTROY,this);
         // caochangli - 增加节点销毁事件
 
@@ -374,8 +376,6 @@ export class Node extends EventDispatcher {
         this.event("destroyAfter",this);
         // caochangli - 增加节点销毁后事件
 
-        this.destroyAllComponent();
-        this._parent && this._parent._removeChild(this);
         //销毁子节点，这里要用_children，所以不能用destroyChildren
         for (let i = 0, n = this._children.length; i < n; i++) {
             let node = this._children[0];
