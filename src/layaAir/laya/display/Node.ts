@@ -379,13 +379,26 @@ export class Node extends EventDispatcher {
         //销毁子节点，这里要用_children，所以不能用destroyChildren
         for (let i = 0, n = this._children.length; i < n; i++) {
             let node = this._children[0];
-            this._children.shift();
-            if (!node)
-                continue;
+            // this._children.shift();
+            // if (!node)
+            //     continue;
 
-            node._setParent(null);
+            // node._setParent(null);
+            // if (destroyChild)
+            //     node.destroy();
+            
+            // caochangli - 同步销毁子节点时，保证子节点remove时 _destroyed 也已经是true
+            if (!node) {
+                this._children.shift();
+                continue;
+            }
+
             if (destroyChild)
                 node.destroy();
+            else {
+                this._children.shift();
+                node._setParent(null);
+            }
         }
         this.onDestroy();
 

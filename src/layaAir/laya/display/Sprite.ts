@@ -2683,7 +2683,8 @@ export class Sprite extends Node {
      * @ignore
      */
     protected _setParent(value: Node, index: number = -1): void {
-        this._globalTrans._spTransChanged(TransformKind.TRS);
+        if (!this._destroyed)//caochangli - 销毁时，应该不需要自身标脏以及向下子节点传递标脏
+            this._globalTrans._spTransChanged(TransformKind.TRS);
 
         super._setParent(value, index);
 
