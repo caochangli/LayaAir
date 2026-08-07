@@ -544,6 +544,10 @@ export class WebRenderStruct2D implements IRenderStruct2D {
 
    private updateChildren(type: ChildrenUpdateType): void {
       if (type == ChildrenUpdateType.None) return;
+
+      // caochangli - 反序列化期间阻止递归刷新子节点，待业务层将预制根节点add时会再次触发
+      if (this.owner && this.owner._isDeserializing) return;
+      
       let info: IClipInfo, blendMode: BlendMode, alpha: number;
       let priority: number = 0, pass: WebRender2DPass = null, enableCulling: boolean = false, dcOptimize: boolean = false;
       let globalShaderData: ShaderData = null, globalRenderData: WebGlobalRenderData = null;
@@ -715,7 +719,8 @@ export class WebRenderStruct2D implements IRenderStruct2D {
          childParentData.enableCulling = false;
          childParentData.dcOptimize = false;
 
-         child.updateChildren(ChildrenUpdateType.All);
+         if (!child.owner || !child.owner._destroyed)//caochangli - 销毁时，应该不需要刷新子节点
+            child.updateChildren(ChildrenUpdateType.All);
       }
    }
 

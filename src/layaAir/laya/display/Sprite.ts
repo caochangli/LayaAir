@@ -1548,8 +1548,22 @@ export class Sprite extends Node {
         }
         return this;
     }
-    /** @internal caochangli - 反序列化期间跳过 _spTransChanged 的 _syncFlag 递归（节点全局缓存初始即全脏，递归标脏为空转）*/
-    _skipSyncFlag: boolean = false;
+
+    /** @internal caochangli - 预制体反序列化期间标记：因反序列化流程固定，增加标记跳过一些重复执行逻辑。
+     * - @反序列化流程
+     *   - 1. 创建节点：从最外层往内创建节点
+     *   - 2. addChild节点：从最内层往外添加节点（最外层节点在预制反序列化完成后，返回给业务层，由业务层负责添加到指定父节点上）
+     *   - 3. 设置节点坐标、尺寸、缩放：从最内层往外层设置decodeObjBounds
+     *   - 4. 设置节点其他属性：从最内层往外层设置_decode
+     *   - 5. 反序列化完成：返回预制节点，业务将其添加到指定父节点上 
+     *   
+     *  -@用途
+     *   - 1. 节点add、pos、rotation、scale、skew时：触发this._globalTrans._spTransChanged（SpriteGlobaTransform._spTransChanged 给自身节点标脏，同时递归往内层给所有子节点标脏）
+     *        - 反序列化期间将 “递归往内层给所有子节点标脏” 逻辑拦截掉，待业务层将预制最外层节点add时会触发 “递归往内层给所有子节点标脏”
+     *   - 2. 节点add、enableCulling、dcOptimize、alpha、setClipRect、subStruct等时：触发 _struct.updateChildren（WebRenderStruct2D.updateChildren 递归往内层给更新有子节点）
+     *        - 反序列化期间将 “递归往内层给更新有子节点” 逻辑拦截掉，待业务层将预制最外层节点add时会触发 “递归往内层给更新有子节点”
+     */
+    _isDeserializing: boolean;
 
     /**
      * @zh Transform改变时的通知，包括坐标，尺寸等，详见TransChangeType定义。

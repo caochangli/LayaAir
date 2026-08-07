@@ -370,8 +370,8 @@ export class SpriteGlobalTransform {
      */
     private _syncFlag(flag: number, value: boolean) {
         if (this._cache) {
-            // caochangli - 反序列化期间节点全局缓存本就全脏，跳过 _syncFlag 子树递归（标脏为空转，省跨节点 O(N²) 冗余）
-            if (this._sp._skipSyncFlag)
+            // caochangli - 反序列化期间阻止递归给子节点标脏，待业务层将预制根节点add时会再次触发
+            if (this._sp._isDeserializing)
                 return;
             // for (let child of this._sp._children) {
             // caochangli - for of 改为 for

@@ -346,9 +346,9 @@ export class HierarchyParser {
             let nodeData = dataList[i];
             let node = allNodes[i];
 
-            // caochangli - 反序列化期间跳过 _syncFlag 递归：节点全局缓存初始全脏，递归标脏为空转
-            if (node) 
-                (<Sprite>node)._skipSyncFlag = true;
+            // caochangli - 设置反序列化期间标记，用于跳过部分重复执行逻辑
+            if (node)
+                (<Sprite>node)._isDeserializing = true;
 
             let children: Array<any> = nodeData._$child;
             if (children) {
@@ -467,15 +467,8 @@ export class HierarchyParser {
         for (let i = 0; i < nodeCnt; i++) {
             let nodeData = dataList[i];
             let node = <Sprite>allNodes[i];
-            // if (node && (node._nodeType === 2 || node === scene))
-            //     decoder.decodeObjBounds(nodeData, node);
-            if (node) {
-                if (node._nodeType === 2 || node === scene)
-                    decoder.decodeObjBounds(nodeData, node);
-
-                // caochangli - 该节点 round1 处理完毕，恢复 _syncFlag 递归（父节点 round1 处理时仍会跳过自己的递归）
-                node._skipSyncFlag = false;
-            }
+            if (node && (node._nodeType === 2 || node === scene))
+                decoder.decodeObjBounds(nodeData, node);
         }
 
         if (hasUI) {
@@ -589,6 +582,13 @@ export class HierarchyParser {
                 node.destroy();
 
             delete nodeMap[nodeId];
+        }
+
+        // caochangli - 反序列化期间标记复原
+        for (let i = 0; i < nodeCnt; i++) {
+            let node = <Sprite>allNodes[i];
+            if (node && !node._destroyed)
+                node._isDeserializing = false;
         }
 
         if (inPrefab && prefabNodeDict && topNode) //记录下nodeMap，上层创建prefab时使用
