@@ -28,12 +28,6 @@ export interface I2DRenderPassFactory {
     createRenderStruct2D(): IRenderStruct2D;
 
     /**
-     * caochangli - 是否支持 alonePass（独立无RT内联子pass）。
-     * 仅 WebGL 驱动支持；GLES/native 的 RTRender2DPass 渲染逻辑在 C++ 层，无 TS 侧 cullAndSort/fillRenderElements 可注入。
-     */
-    readonly supportAlonePass?: boolean;
-
-    /**
      * caochangli - 创建独立pass子树根在父pass中的占位渲染元素。
      * 仅 supportAlonePass 为 true 的驱动返回有效实例，其余返回 null。
      */

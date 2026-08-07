@@ -22,9 +22,6 @@ import { IRenderStruct2D } from "../../RenderModuleData/Design/2D/IRenderStruct2
 
 export class WebGLRender2DProcess implements I2DRenderPassFactory {
 
-    /** caochangli - WebGL 驱动支持 alonePass */
-    readonly supportAlonePass: boolean = true;
-
     constructor() {
 
     }
