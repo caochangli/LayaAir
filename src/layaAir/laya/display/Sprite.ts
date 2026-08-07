@@ -46,6 +46,7 @@ import { Tween } from "../tween/Tween";
 // import { SEventSystem } from "../sgsExpand/event/SEventSystem";
 import { IAssetGroup, AssetGroup } from "../sgsExpand/loader/AssetGroup";
 import { Loader } from "../net/Loader";
+import { Browser } from "../utils/Browser";
 
 
 const hiddenBits = NodeFlags.NOT_IN_PAGE;
@@ -1052,7 +1053,7 @@ export class Sprite extends Node {
     }
 
     private _renderFlag:string = "";
-    /**caochangli - 增加渲染标记
+    /**caochangli - 增加渲染标记（仅webGL生效）
      * - 用于drawCallOptimize=true的列表中，因单图、spine节点不能合批不调整位置，从而打断后续能合批节点的合批问题
      * - 在在需要调整渲染顺序的单图、spine节点上设置（spine尺寸可通过设置较小的size来规避位置重叠问题）
      * - 注意：”图集、文本“节点不需要设置 */
@@ -1060,6 +1061,9 @@ export class Sprite extends Node {
     {
         if (value == null) value = "";
         if (this._renderFlag === value)
+            return;
+        // 仅WebGL驱动支持 - GLES/native的RTRender2DPass无TS侧cullAndSort/GraphicsBatch(源码在C++层，无法修改)
+        if (Browser.onLayaRuntime)
             return;
         this._renderFlag = value;
         this._struct.setRepaint();
@@ -1244,7 +1248,7 @@ export class Sprite extends Node {
             return;
 
         // 仅WebGL驱动支持 - GLES/native的RTRender2DPass无TS侧cullAndSort/fillRenderElements(源码在C++层，无法修改)
-        if (!LayaGL.render2DRenderPassFactory.supportAlonePass)
+        if (Browser.onLayaRuntime)
             return;
 
         // 同一节点 - mask、cacheAs='bitmap'、postProcess 与 alonePass互斥

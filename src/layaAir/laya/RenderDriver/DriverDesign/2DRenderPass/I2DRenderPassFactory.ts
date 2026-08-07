@@ -29,7 +29,7 @@ export interface I2DRenderPassFactory {
 
     /**
      * caochangli - 创建独立pass子树根在父pass中的占位渲染元素。
-     * 仅 supportAlonePass 为 true 的驱动返回有效实例，其余返回 null。
+     * 仅 webGL 的驱动返回有效实例，其余返回 null。
      */
     createAloneRenderElement2D?(subPass: IRender2DPass, owner: IRenderStruct2D): IRenderElement2D;
 
