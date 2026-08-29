@@ -1480,10 +1480,11 @@ export class Loader extends EventDispatcher {
 
     /** @ignore */
     _parseFileConfig(fileConfig: any) {
-        // caochangli - 补充纹理meta信息(fileconfig文件中去掉了纹理的通用的meta信息)
-        let textureMeta = Object.assign({}, Loader.textureMeta);
-        delete textureMeta.type;
-        delete textureMeta.generateMipmap;
+        if (!fileConfig) return;
+        // caochangli - 补充纹理meta信息
+        if (fileConfig.texDefaultConfig)//fileconfig中带了纹理默认meta信息，则以fileconfig为准
+            Loader.textureMeta = fileConfig.texDefaultConfig;
+        let textureMeta = fileConfig.texDefaultConfig;
         // caochangli - 补充纹理meta信息
 
         let files: Array<string> = [];
@@ -1550,9 +1551,12 @@ export class Loader extends EventDispatcher {
             let file = files[m + k];
             switch (c.t) {
                 case 0: //图片
-                    // caochangli - 补充纹理meta信息(fileconfig文件中去掉了纹理的通用的meta信息)
-                    if (!c.files)
-                        Object.assign(c, textureMeta);
+                    // caochangli - 补充纹理meta信息(fileconfig文件中去掉了纹理的默认的meta信息)
+                    for (let key in textureMeta)
+                    {
+                        if (c[key] === undefined)
+                            c[key] = textureMeta[key];
+                    }
                     metaMap[file] = c;
                     break;
                 case 1: //自动图集
