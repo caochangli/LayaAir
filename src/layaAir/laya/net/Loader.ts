@@ -1484,7 +1484,7 @@ export class Loader extends EventDispatcher {
         // caochangli - 补充纹理meta信息
         if (fileConfig.texDefaultConfig)//fileconfig中带了纹理默认meta信息，则以fileconfig为准
             Loader.textureMeta = fileConfig.texDefaultConfig;
-        let textureMeta = fileConfig.texDefaultConfig;
+        let textureMeta = Loader.textureMeta;
         // caochangli - 补充纹理meta信息
 
         let files: Array<string> = [];
