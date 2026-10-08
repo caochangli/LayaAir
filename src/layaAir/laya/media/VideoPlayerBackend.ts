@@ -66,6 +66,7 @@ export class VideoPlayerBackend {
      */
     allowBackground: boolean = false;
 
+    protected _source: string;
     protected _owner: Sprite;
     protected _playing: boolean = false;
     protected _loaded: boolean = false;
@@ -181,10 +182,16 @@ export class VideoPlayerBackend {
      * @zh 加载视频
      */
     load(url: string) {
+        this._source = url;
         if (!url)
             return;
 
-        AssetDb.inst.resolveURL(url, url2 => this.onLoad(url2));
+        AssetDb.inst.resolveURL(url, url2 => {
+            if (this._owner && this._source === url)//caochangli - 保护
+            {
+                this.onLoad(url2);
+            }
+        });
     }
 
     /**
@@ -257,6 +264,7 @@ export class VideoPlayerBackend {
      * @zh 销毁视频播放器
      */
     destroy() {
+        this._source = null;
         this.onDestroy();
         this.attachTo(null);
         ILaya.stage.off(Event.BLUR, this, this.onBlur);

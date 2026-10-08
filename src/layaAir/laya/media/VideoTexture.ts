@@ -311,8 +311,10 @@ export class VideoTexture extends BaseTexture {
                 this._texture = null;
             }
             AssetDb.inst.resolveURL(url, url2 => {
-                if (this._source === url)
+                if (!this._destroyed && this._source === url)
+                {
                     this.onLoad(url2);
+                }
             });
         }
         else
@@ -384,6 +386,7 @@ export class VideoTexture extends BaseTexture {
      * @zh 销毁当前实例并释放资源。
      */
     destroy() {
+        this._source = null;
         this._playing = false;
         ILaya.timer.clear(this, this.render);
         ILaya.stage.off(Event.BLUR, this, this.onBlur);

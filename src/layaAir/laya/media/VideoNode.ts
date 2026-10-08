@@ -65,6 +65,8 @@ export class VideoNode extends Sprite {
     }
 
     set source(value: string) {
+        if (this._comp.source == value)//caochangli - 过滤判断
+            return;
         this._comp.source = value;
     }
 

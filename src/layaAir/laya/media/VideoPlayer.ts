@@ -6,6 +6,7 @@ import { Sprite } from "../display/Sprite";
 import { Event } from "../events/Event";
 import { PAL } from "../platform/PlatformAdapters";
 import { Texture } from "../resource/Texture";
+import { Browser } from "../utils/Browser";
 import { IVideoPlayerOptions, VideoPlayerBackend } from "./VideoPlayerBackend";
 import { VideoTexture } from "./VideoTexture";
 
@@ -282,6 +283,10 @@ export class VideoPlayer extends Component {
                 vt = PAL.media.createVideoTexture();
         }
         else { //if (backendType === "decoder") 
+            // caochangli - native环境下 decoder模式切换视频源会“报错、黑屏、闪退”
+            if (Browser.onLayaRuntime)
+                this._unload();
+
             vt = (this._vtex || PAL.media.createVideoTexture());
             if (!vt)
                 player = PAL.media.createVideoPlayer();

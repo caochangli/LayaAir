@@ -56,19 +56,64 @@ export class NativeVideoTexture extends VideoTexture {
         this.decoder.seek(value * 1000);
     }
 
+    // caochangli - native环境下视频播放 - 先dcc下载到本地，再将本地路径传给native
     protected onLoad(url: string): void {
-        let src = this._source;
         this._ended = false;
         this._waitFirstFrame = false;
-        if (this._loaded)
-            this.decoder.stop();
-        this._loaded = false;
 
-        if (this._source !== src)
-            return;
+        // 先把远端地址格式化为 src
+        let src = URL.postFormatURL(URL.formatURL(url));
+        let dccClient = (window as any).dcc;
+
+        const runStart = () => {
+            if (this._destroyed || this._source !== url) return;
+
+            if (!src || !dccClient || src.startsWith("https://") || src.startsWith("http://")) {
+                this.onLoad1(src);
+                return;
+            }
+
+            // 使用 dcc 把视频下载到本地，使用本地路径播放
+            dccClient.updateFile(src).then((result: { isSucc: boolean, localPath: string }) => {
+                if (!this._destroyed && this._source === url) {
+                    if (result.isSucc && result.localPath)
+                        this.onLoad1("[dccLocalPath]" + result.localPath);
+                    else
+                        this.onLoad1(src);
+                }
+            }, () => {
+                if (!this._destroyed && this._source === url)
+                    this.onLoad1(src);
+            });
+        };
+
+        // 如果当前已经在播放，先 stop，避免 decoder.start 与 stop 并发
+        if (this._loaded) {
+            this._loaded = false;
+            const ticket = this._source;
+            this.decoder.stop().then(() => {
+                // ticket 用于防止 stop 期间又发起了新的加载
+                if (this._source === ticket)
+                    runStart();
+            });
+        }
+        else {
+            runStart();
+        }
+    }
+    protected onLoad1(url: string): void {
+        // let src = this._source;
+        // this._ended = false;
+        // this._waitFirstFrame = false;
+        // if (this._loaded)
+        //     this.decoder.stop();
+        // this._loaded = false;
+
+        // if (this._source !== src)
+        //     return;
 
         this._startOption = {};
-        this._startOption.source = URL.postFormatURL(URL.formatURL(url));
+        this._startOption.source = url;//URL.postFormatURL(URL.formatURL(url));
         if (Browser.isIOSHighPerformanceModePlus)
             this._startOption.videoDataType = 2;
 
@@ -95,7 +140,8 @@ export class NativeVideoTexture extends VideoTexture {
         this.decoder.stop();
     }
     onRender(): boolean {
-        LayaGL.textureContext.setTextureImageData(this._texture, this.decoder, false, false);
+        if (this._texture)
+            LayaGL.textureContext.setTextureImageData(this._texture, this.decoder, false, false);
         return true;
     }
     protected onDestroy(): void {

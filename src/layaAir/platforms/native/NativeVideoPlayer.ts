@@ -59,17 +59,44 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
         if (this.video)
             this.video.playbackRate = value;
     }
-
+    
+    // caochangli - native环境下视频播放 - 先dcc下载到本地，再将本地路径传给native
     protected onLoad(url: string): void {
         this._ended = false;
         if (this._loaded)
             this.video.destroy();
+        
+        let src = URL.postFormatURL(URL.formatURL(url));
+        let dccClient = (window as any).dcc;
+        if (!src || !dccClient || src.startsWith("https://") || src.startsWith("http://"))
+        {
+            this.onLoad1(src);
+            return;
+        }
+
+        // 使用dcc下载文件到本地，使用本地路径播放
+        dccClient.updateFile(src).then((result:{isSucc:boolean,localPath:string}) => {
+            if (this._owner && this._source === url) {
+                if (result.isSucc && result.localPath)
+                    this.onLoad1("[dccLocalPath]" + result.localPath);
+                else
+                    this.onLoad1(src);
+            }
+        }, () => {
+            if (this._owner && this._source === url)
+                this.onLoad1(src);
+        });
+    }
+    protected onLoad1(url: string): void {
+        // this._ended = false;
+        // if (this._loaded)
+        //     this.video.destroy();
 
         (<Mutable<this>>this).video = PAL.g.createVideo(Object.assign({},
             this.options,
             this.getNodeTransform(),
             {
-                src: URL.postFormatURL(URL.formatURL(url)),
+                src: url,//URL.postFormatURL(URL.formatURL(url)),
                 autoplay: this._playing,
                 loop: this._loop,
                 muted: this._muted,
@@ -83,11 +110,13 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
     }
 
     protected onPlay(): void {
-        this.video.play();
+        if (this.video)
+            this.video.play();
     }
 
     protected onPause(): void {
-        this.video.pause();
+        if (this.video)
+            this.video.pause();
     }
 
     protected onTransformChanged(): void {
@@ -103,6 +132,7 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
     }
 
     protected onDestroy(): void {
-        this.video.destroy();
+        if (this.video)
+            this.video.destroy();
     }
 }
