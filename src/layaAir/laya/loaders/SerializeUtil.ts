@@ -45,7 +45,7 @@ export class SerializeUtil {
                 // for (let d of arr) {
                 // caochangli - for of 改成 for
                 for (let arrIndex = 0,arrLength = arr.length; arrIndex < arrLength; arrIndex++) {
-                    let d = arr[i];
+                    let d = arr[arrIndex];
                     let od = d._$override || d._$parent;
                     let k: string;
                     if (Array.isArray(od))
