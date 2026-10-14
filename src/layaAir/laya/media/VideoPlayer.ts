@@ -274,6 +274,10 @@ export class VideoPlayer extends Component {
     }
 
     private _load() {
+
+        // caochangli - 不复用_api(切换视频源时，报错、黑屏、闪退、各种状态"_playing、_loaded、_ended"不重置、render定时器不停止等)
+        this._unload();
+
         let player: VideoPlayerBackend;
         let vt: VideoTexture;
         let backendType = LayaEnv.isPlaying ? this.mode : "decoder";
@@ -283,10 +287,6 @@ export class VideoPlayer extends Component {
                 vt = PAL.media.createVideoTexture();
         }
         else { //if (backendType === "decoder") 
-            // caochangli - native环境下 decoder模式切换视频源会“报错、黑屏、闪退”
-            if (Browser.onLayaRuntime)
-                this._unload();
-
             vt = (this._vtex || PAL.media.createVideoTexture());
             if (!vt)
                 player = PAL.media.createVideoPlayer();
@@ -310,6 +310,8 @@ export class VideoPlayer extends Component {
                 this._vtex = vt;
                 this._vtex.on(Event.READY, this, this._vtReady);
                 this._vtex.on("videoUpdate", this.owner, this.owner.reCache);
+                this._vtex.on("error", this, this._vtError);// caochangli - decoder模式补充视频事件
+                this._vtex.on("ended", this, this._vtEnded);// caochangli - decoder模式补充视频事件
                 if (!this._textureCmd) {
                     this._textureCmd = DrawTextureCmd.create(new Texture(), 0, 0, 1, 1, null, null, null, null, null, true);
                     (this._textureCmd as IGraphicsCmd).lock = true;
@@ -337,13 +339,30 @@ export class VideoPlayer extends Component {
 
     private _vtReady() {
         this._textureCmd.texture.setTo(this._vtex);
-        this.owner?.graphics.repaint();
+        if (this.owner) {
+            this.owner.graphics.repaint();
+            this.owner.event(Event.READY);
+        }
     }
+
+    // caochangli - decoder模式补充视频事件
+    private _vtError(err:any) {
+        if (this.owner)
+            this.owner.event("error",err);
+    }
+
+    private _vtEnded() {
+        if (this.owner)
+            this.owner.event("ended");
+    }
+    // caochangli - decoder模式补充视频事件
 
     private _unload() {
         if (this._vtex) {
             this._vtex.off(Event.READY, this, this._vtReady);
             this._vtex.off("videoUpdate", this.owner, this.owner.reCache);
+            this._vtex.off("error", this, this._vtError);// caochangli - decoder模式补充视频事件
+            this._vtex.off("ended", this, this._vtEnded);// caochangli - decoder模式补充视频事件
             this._vtex.destroy();
             this._vtex = null;
             this.owner.graphics.removeCmd(this._textureCmd, true);
