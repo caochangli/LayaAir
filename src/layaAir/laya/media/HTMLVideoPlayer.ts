@@ -16,6 +16,21 @@ export class HTMLVideoPlayer extends VideoPlayerBackend {
         super();
 
         this.element = HTMLVideoPlayer.createElement();
+
+        // caochangli - 补充视频事件
+        this.element.addEventListener("loadedmetadata", () => {
+            if (this._owner)
+                this.setLoaded();
+        });
+        this.element.addEventListener("ended", () => {
+            if (this._owner)
+                this._owner.event("ended");
+        });
+        this.element.addEventListener("error", (err:any)=> {
+            if (this._owner)
+                this._owner.event("error",err);
+        },true);
+        // caochangli - 补充视频事件
     }
 
     get currentTime(): number {
@@ -71,8 +86,10 @@ export class HTMLVideoPlayer extends VideoPlayerBackend {
     }
 
     protected onLoad(url: string) {
+        this._loaded = false;//caochangli - 重置状态
         this.element.controls = this.options.controls ?? false;
         HTMLVideoPlayer.setSrc(this.element, url);
+        this.element.load();// caochangli - 修复切换视频时还是播放之前的视频 
         if (this.options.underGameView) {
             let c = Browser.container;
             if (c !== Browser.document.body)
@@ -83,7 +100,7 @@ export class HTMLVideoPlayer extends VideoPlayerBackend {
         else
             Browser.document.body.appendChild(this.element);
         this.onTransformChanged();
-        this.setLoaded();
+        // this.setLoaded();//caochangli - 拿到loadedmetadata事件中执行
     }
 
     protected onPlay() {

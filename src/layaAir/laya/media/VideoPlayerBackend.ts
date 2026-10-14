@@ -240,6 +240,10 @@ export class VideoPlayerBackend {
 
         if (this._playing)
             this.onPlay();
+
+        // caochangli - 补充视频准备完成事件
+        if (this._owner)
+            this._owner.event(Event.READY, this);
     }
 
     protected getNodeTransform() {

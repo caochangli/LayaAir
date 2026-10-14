@@ -19,16 +19,27 @@ export class HTMLVideoTexture extends VideoTexture {
 
         let ele = this.element = HTMLVideoPlayer.createElement();
 
-        ele.addEventListener("loadedmetadata", () =>
-            this.setLoaded(this.element.videoWidth, this.element.videoHeight, Browser.onLayaRuntime));
+        ele.addEventListener("loadedmetadata", () => {
+            if (!this._destroyed)
+                this.setLoaded(this.element.videoWidth, this.element.videoHeight, Browser.onLayaRuntime);
+        });
         ele.addEventListener("canplay", () => {
-            //让画面显示出来，而不是黑色
-            if (!this._playing)
-                this.render(true);
+            if (!this._destroyed) {
+                //让画面显示出来，而不是黑色
+                if (!this._playing)
+                    this.render(true);
+            }
         });
         ele.addEventListener("ended", () => {
-            this.event("ended");
+            if (!this._destroyed)
+                this.event("ended");
         });
+        // caochangli - 补充视频事件
+        ele.addEventListener("error", (err:any) => {
+            if (!this._destroyed)
+                this.event("error",err);
+        },true);
+        // caochangli - 补充视频事件
 
         if ("requestVideoFrameCallback" in HTMLVideoElement.prototype) {
             const scope = this;
@@ -96,6 +107,7 @@ export class HTMLVideoTexture extends VideoTexture {
     }
 
     protected onLoad(url: string) {
+        this._loaded = false;//caochangli - 重置状态
         HTMLVideoPlayer.setSrc(this.element, url);
         this.element.load();
     }
@@ -115,7 +127,8 @@ export class HTMLVideoTexture extends VideoTexture {
 
     protected onRender(): boolean {
         if (!this._hasRequestVideoFrame || this._needUpdate) {
-            LayaGL.textureContext.updateVideoTexture(this._texture, this.element, false, false);
+            if (this._texture)//caochangli - 保护
+                LayaGL.textureContext.updateVideoTexture(this._texture, this.element, false, false);
             this._needUpdate = false;
             return true;
         }
