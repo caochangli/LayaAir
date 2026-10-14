@@ -141,7 +141,7 @@ export class NativeVideoTexture extends VideoTexture {
             dccClient.updateFile(src).then((result: { isSucc: boolean, localPath: string }) => {
                 if (!this._destroyed && this._source === url) {
                     if (result.isSucc && result.localPath)
-                        this.onLoad1("[dccLocalPath]" + result.localPath);
+                        this.onLoad1(NativeVideoProxy.DCC_LOCAL_PATCH_TAG + result.localPath);
                     else
                         this.onLoad1(src);
                 }

@@ -58,11 +58,12 @@ import { Browser } from "../../laya/utils/Browser";
 export class NativeVideoProxy {
 
 //静态方法-------------------
-    private static videoEventRegistered = false;
-    private static videoIdSeed = 0;
-    private static videoProxyMap = new Map();
-
+    static DCC_LOCAL_PATCH_TAG:string = "[dccLocalPath]";
     static VIDEO_HELPER_CLASS = "com.yoka.dgxj.libs.QGVideoHelper";
+
+    private static videoEventRegistered:boolean = false;
+    private static videoIdSeed:number = 0;
+    private static videoProxyMap = new Map();
 
     /**创建桥接视频ID */
     static createVideoID() {
@@ -131,7 +132,16 @@ export class NativeVideoProxy {
         
         this._videoID = NativeVideoProxy.createVideoID();
         this._owner = owner;
-        if (!src.includes("[dccLocalPath]")) {//远程目录，拼接上url前缀
+
+        // 本地dcc资源 - 去掉本地标记 
+        let tag = NativeVideoProxy.DCC_LOCAL_PATCH_TAG;
+        if (src.includes(tag)) {
+            let index = src.indexOf(tag);
+            if (index >= 0)
+                src = src.substring(index + tag.length);
+        } 
+        // 远程资源 - 拼接上dcc url前缀
+        else {
             let dccClient = (window as any).dcc;
             if (dccClient && dccClient._pathMapToDCC)
                 src = dccClient._pathMapToDCC + src;
