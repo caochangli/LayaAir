@@ -9,7 +9,7 @@ import { NativeVideoProxy } from "./NativeVideoProxy";
 /**
  * caochangli - 备注：Laya原始缺少下列功能
  * 缺少功能接口，如：duration、volume
- * 缺少事件通知，如：ended、error
+ * 缺少事件通知，如：loadedmetadata、ended、error
  * 对缺少的功能采用扩展桥接的方式实现了(目前仅实现了安卓)
  * 
  * 同时自定义了一套原生视频播放方式(通过NativeVideoProxy桥接，目前仅实现了安卓)
@@ -153,7 +153,7 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
                     this._owner.event("error",err);
                 }
             });
-            this.video.onReady((err: any) => {
+            this.video.onReady(() => {
                 if (this._owner) {
                     this.setLoaded();
                 }
@@ -222,25 +222,25 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
     }
     
     /**native回调 - LayaVideoPlayer.java的扩展事件 */
-    handleEvent(ret:number, msg:any) {                     
+    handleEvent(ret:string, msg:any) {                     
         if (!this._owner)
             return;
         switch (ret) {
-            case 4000: //视频元数据已加载 (此时已知视频宽高、总时长)
-                this.getPlayerInfo();    
+            case "loadedmetadata": //视频元数据已加载 (此时已知视频宽高、总时长)
+                this.getPlayerInfo();   
                 this.setLoaded();
                 break;
-            case 4001: //播放结束
+            case "canplay": //首帧已渲染
+                break;
+            case "ended": //播放结束
                 if (this._owner) {
                     this._ended = true;
                     this._owner.event("ended");
                 }
                 break;
-            case 4002: //播放错误
+            case "error": //播放错误
                 if (this._owner)
                     this._owner.event("error",msg);
-                break;
-            case 4003: //首帧已渲染
                 break;
         }
     }

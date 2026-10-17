@@ -262,23 +262,23 @@ export class NativeVideoProxy {
     }
 
     /**native回调 */
-    handleEvent(ret:number, msg:any) {
+    handleEvent(ret:string, msg:any) {
         if (!this._owner)
             return;
         switch (ret) {
-            case 4000: //视频元数据已加载 (此时已知视频宽高、总时长)
+            case "loadedmetadata": //视频元数据已加载 (此时已知视频宽高、总时长)
                 if (this._onReady)
                     this._onReady();
                 break;
-            case 4001: //播放结束
+            case "canplay": //首帧已渲染
+                break;
+            case "ended": //播放结束
                 if (this._onEnded)
                     this._onEnded();
                 break;
-            case 4002: //播放错误
+            case "error": //播放错误
                 if (this._onError)
                     this._onError(msg);
-                break;
-            case 4003: //首帧已渲染
                 break;
         }
     }

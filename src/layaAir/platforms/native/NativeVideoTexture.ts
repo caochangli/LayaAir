@@ -228,18 +228,19 @@ export class NativeVideoTexture extends VideoTexture {
     }
 
     /**native回调 */
-    handleEvent(ret:number, msg:any) {                     
+    handleEvent(ret:string, msg:any) {                     
         if (this._destroyed)
             return;
+        // Laya官方只缺少了error事件（即只有error用了扩展事件）
         switch (ret) {
-            case 4000: //视频元数据已加载 (此时已知视频宽高、总时长)
+            case "loadedmetadata": //视频元数据已加载 (此时已知视频宽高、总时长)
                 break;
-            case 4001: //播放结束
+            case "canplay": //首帧已渲染
                 break;
-            case 4002: //播放错误
+            case "ended": //播放结束
+                break;
+            case "error": //播放错误
                 this.event("error",msg);
-                break;
-            case 4003: //首帧已渲染
                 break;
         }
     }
