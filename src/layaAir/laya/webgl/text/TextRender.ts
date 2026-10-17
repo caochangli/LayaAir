@@ -304,9 +304,11 @@ export class TextRender {
             // caochangli - 该区域被其他文本复用时，删除原textMap
             if (region.key != null) {
                 let r = this.textMap.get(region.key);
-                if (r.imgdt)
-                    this.addRunTimeCache(r.key,r.imgdt);
-                this.textMap.delete(region.key);
+                if (r) {
+                    if (r.imgdt)
+                        this.addRunTimeCache(r.key,r.imgdt);
+                    this.textMap.delete(region.key);
+                }
                 region.key = null;
             }
 
