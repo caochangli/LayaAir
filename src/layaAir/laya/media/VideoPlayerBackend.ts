@@ -68,6 +68,7 @@ export class VideoPlayerBackend {
 
     protected _source: string;
     protected _owner: Sprite;
+    /**caochangli - 播放中状态：播放结束没有重置(单次播放结束后调用play无效) */
     protected _playing: boolean = false;
     protected _loaded: boolean = false;
 

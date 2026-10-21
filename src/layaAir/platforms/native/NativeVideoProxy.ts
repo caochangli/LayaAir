@@ -213,6 +213,10 @@ export class NativeVideoProxy {
         this.callVideoHelper("seek",{ms:Math.round(ms)}); 
     }
 
+    durationOffest(ms:number) { 
+        this.callVideoHelper("durationOffest",{ms:Math.round(ms)}); 
+    }
+
     play() { 
         this.callVideoHelper("play");
     }

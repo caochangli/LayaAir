@@ -272,6 +272,12 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
         }
     }
 
+    protected onBlur() {
+        // native安卓 - 前后台切换暂停、恢复视频在native层已实现
+        if (!Browser.onAndroid)
+            super.onBlur();
+    }
+
     protected onDestroy(): void {
         if (this.video)
             this.video.destroy();
