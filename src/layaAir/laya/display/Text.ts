@@ -1092,6 +1092,11 @@ export class Text extends Sprite {
         this._hideText = value;
         if (value) {
             this.graphics.clear(true, this._bgDrawCmd);
+            //liurui - 输入框为空时，焦点在输入框时显示提示文字
+            if (!this._text && this._prompt) {
+                this.markChanged();
+                this.typeset();
+            }
         }
         else {
             this.markChanged();
@@ -1105,8 +1110,17 @@ export class Text extends Sprite {
      */
     protected _typeset(): void {
         this._isChanged = false;
-        if (this._hideText || this._destroyed)
+        // if (this._hideText || this._destroyed)
+        //     return;
+        if (this._destroyed)
             return;
+        //liurui - 输入框为空时，焦点在输入框时显示提示文字
+        if (this._hideText) {
+            if (this._text || !this._prompt) {
+                this.graphics.clear(true, this._bgDrawCmd);
+                return;
+            }
+        }
 
         HtmlElement.returnToPool(this._elements);
         if (this._objContainer)
