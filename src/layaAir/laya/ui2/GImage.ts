@@ -142,7 +142,6 @@ export class GImage extends GWidget {
         // caochangli - 预览模式图片中散图因uuid和路径映射关系还没有,获取不到纹理问题修复
         if (!tex && LayaEnv.isPreview)
             tex = AssetDb.inst.previewAtlasTexture(this._src);
-
         if (tex && tex.url)
         {
             //图集中小图 - 计数记到图集上

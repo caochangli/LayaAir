@@ -287,29 +287,11 @@ export class GLoader extends GWidget {
         else
             this._cancelSrcLoad();
 
-        //没有获取到AssetGroup - 走引擎原逻辑
-        if (!this._srcAssetGroup)
-        {
-            let loadKey = this._src;
-            let loadType = Utils.getFileExtension(loadKey) == Loader.ATLAS ? Loader.ATLAS : Loader.IMAGE;
-            if (loadType == Loader.IMAGE && URL.isAtlasInImage(loadKey))//图集中散图 - 加载图集
-            {
-                loadKey = loadKey.substring(0, loadKey.lastIndexOf("/")) + ".atlas";
-                loadType = Loader.ATLAS;
-            }
-            ILaya.loader.load(loadKey, loadType).then(() => {
-                let res = Loader.getRes(this._src);
-                this.onLoaded(<Texture | AtlasResource>res);
-            });
-            return;
-        }
-
         let tex:Texture | AtlasResource = Loader.getRes(this._src);
         
         // caochangli - 预览模式图片中散图因uuid和路径映射关系还没有,获取不到纹理问题修复
         if (!tex && LayaEnv.isPreview)
             tex = AssetDb.inst.previewAtlasTexture(this._src);
-        
         if (tex && tex.url)
         {   
             //图集中小图 - 计数记到图集上
