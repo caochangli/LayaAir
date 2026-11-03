@@ -10,6 +10,7 @@ import { IMeshFactory } from "../display/mesh/MeshFactory";
 import { AssetDb } from "../resource/AssetDb";
 import { AssetGroup, IAssetGroup } from "../sgsExpand/loader/AssetGroup";
 import { LayaEnv } from "../../LayaEnv";
+import { URL } from "../net/URL";
 
 /**
  * @en GImage is a widget that displays an image resource. Set the image resource URL using the src property. By default, the autoSize property is true, so the node will automatically adjust to the original size of the image when the src is changed; if you want the node size not to change with the image size, you can set the autoSize property to false.
@@ -20,7 +21,8 @@ export class GImage extends GWidget {
     private _src: string = "";
     private _color: string;
     private _autoSize: boolean;
-    private _loadId: number = 0;
+    // private _loadId: number = 0;
+    private _loadUrl:string;//caochangli - 使用_loadUrl代替_loadId
 
     private _renderer: ImageRenderer;
 
@@ -82,7 +84,7 @@ export class GImage extends GWidget {
     }
 
     /**
-     * 只能加载单图 - 如果传入的是还未加载的图集散图，则无法加载成功(如果图集已经加载过了，倒是可以)。
+     * 加载图片 - 若传入的是图集散图时会自动加载其所属图集，完成后取对应散图显示。
      */
     set src(value: string) {
         if (value == null)
@@ -91,7 +93,7 @@ export class GImage extends GWidget {
             return;
 
         this._src = value;
-        let loadID = ++this._loadId;
+        // let loadID = ++this._loadId;
         // if (value) {
         //     //在反序列化时，禁止立刻设置texture，因为autoSize值还没反序列化
         //     let tex = SerializeUtil.isDeserializing ? null : Loader.getRes(value);
@@ -104,58 +106,52 @@ export class GImage extends GWidget {
         //     this.onLoaded(null, loadID);
 
         //caochangli - 走业务层资源管理器
-        this._loadSrcImage(loadID);
+        this._loadSrcImage();
     }
 
     //caochangli - 走业务层资源管理器
     private _srcAssetGroup:IAssetGroup;
-    private _loadSrcImage(loadID:number) {
+    private _loadSrcImage() {
 
         //空路径
         if (!this._src)
         {
             // caochangli - button按钮换肤不需要取消加载
-            if (!this._isBtnImage)
-                this._cancelSrcLoad();
-            this.onLoaded(null, loadID);
+            this._isBtnImage ? this._loadUrl = null : this._cancelSrcLoad();
+            this.onLoaded(null);
             return;
         }
 
         //本次需要的资源正在加载中 - 等待加载完成
-        if (this._srcAssetGroup && this._srcAssetGroup.IsResLoading(this._src))
-            return;
+        if (this._srcAssetGroup)
+        {
+            let loadKey = this._src;
+            if (URL.isAtlasInImage(loadKey))
+                loadKey = loadKey.substring(0, loadKey.lastIndexOf("/")) + ".atlas";
+            if (this._srcAssetGroup.IsResLoading(loadKey))
+                return;
+        }
 
         if (!this._srcAssetGroup)
             this._srcAssetGroup = AssetGroup.Get();
-         // caochangli - button按钮换肤不需要取消加载
-        else if (!this._isBtnImage)
-            this._srcAssetGroup.CancelAllAssets(true);
-
-        //没有获取到AssetGroup - 走引擎原逻辑
-        if (!this._srcAssetGroup)
-        {
-            let tex = Loader.getRes(this._src);
-            if (tex)
-                this.onLoaded(tex, loadID);
-            else
-                ILaya.loader.load(this._src, Loader.IMAGE).then(res => this.onLoaded(res, loadID));
-            return;
-        }
+        else// caochangli - button按钮换肤不需要取消加载
+            this._isBtnImage ? this._loadUrl = null : this._cancelSrcLoad();
 
         let tex:Texture = Loader.getRes(this._src);
-        
+
         // caochangli - 预览模式图片中散图因uuid和路径映射关系还没有,获取不到纹理问题修复
         if (!tex && LayaEnv.isPreview)
             tex = AssetDb.inst.previewAtlasTexture(this._src);
-        
+
         if (tex && tex.url)
-        {   
+        {
             //图集中小图 - 计数记到图集上
             if (tex._atlas && tex._atlas.url)
                 this._srcAssetGroup.OnlyAddReference(tex._atlas.url);
             else
                 this._srcAssetGroup.OnlyAddReference(tex.url,tex);
-            this.onLoaded(tex, loadID);
+            this._loadUrl = this._src;
+            this.onLoaded(tex);
         }
         else//需要加载资源
         {
@@ -165,30 +161,40 @@ export class GImage extends GWidget {
             //预览模式 - 将uuid转成url
             if (LayaEnv.isPreview)
             {
-                AssetDb.inst.uuidToUrl(this._src,(uuid:string,uuidUrl:string)=>{
+                AssetDb.inst.uuidToUrl(this._src,(uuid:string,srcUrl:string)=>{
                     if (!this.destroyed && this._src && uuid == this._src)
                     {
-                        if (!uuidUrl)
-                            this.onLoaded(null, loadID);
+                        if (!srcUrl)
+                            this.onLoaded(null);
                         else
-                            this._srcAssetGroup.Load(uuidUrl,Loader.IMAGE,this,(url:string,res:Texture)=>{
-                                if (url == this._src || uuid == this._src)//需要的资源正在加载中时会被挡掉，但当加载完时loadID又没对上
-                                    loadID = this._loadId;
-                                this.onLoaded(res, loadID);
-                            });
+                            this._startSrcLoad(srcUrl);
                     }
                 });
             }
             //生产模式 - 没有uuid，都是用路径加载的
             else
-                this._srcAssetGroup.Load(this._src,Loader.IMAGE,this,(url:string,res:Texture)=>{
-                    if (url == this._src)//需要的资源正在加载中时会被挡掉，但当加载完时loadID又没对上
-                        loadID = this._loadId;
-                    this.onLoaded(res, loadID);
-                });
+                this._startSrcLoad(this._src);
         }
     }
+    private _startSrcLoad(srcUrl:string) {
+        let loadUrl = srcUrl;
+        let loadType = Loader.IMAGE;
+        if (URL.isAtlasInImage(srcUrl))//图集中散图 - 加载图集
+        {
+            loadUrl = srcUrl.substring(0,srcUrl.lastIndexOf("/")) + ".atlas";
+            loadType = Loader.ATLAS;
+        }
+        this._loadUrl = loadUrl;
+        this._srcAssetGroup.Load(loadUrl,loadType,this,(url:string,res:Texture)=>{
+            if (url !== this._loadUrl)
+                return;
+            if (res && URL.isAtlasInImage(this._src))//图集中散图 - 以当前src转成对应散图资源
+                res = <Texture>Loader.getRes(this._src);
+            this.onLoaded(res);
+        });
+    }
     private _cancelSrcLoad() {
+        this._loadUrl = null;
         if (this._srcAssetGroup)
             this._srcAssetGroup.CancelAllAssets(true);
     }
@@ -206,9 +212,8 @@ export class GImage extends GWidget {
             return;
         this._src = value && value.url || "instance-0";
         // caochangli - button按钮换肤不需要取消加载
-        if (!this._isBtnImage)
-            this._cancelSrcLoad();
-        this.onLoaded(value, ++this._loadId);
+        this._isBtnImage ? this._loadUrl = null : this._cancelSrcLoad();
+        this.onLoaded(value);
     }
 
     /**
@@ -262,8 +267,10 @@ export class GImage extends GWidget {
         this._renderer.setColor(value);
     }
 
-    protected onLoaded(tex: Texture, loadID: number) {
-        if (this._loadId != loadID || this.destroyed)
+    protected onLoaded(tex: Texture) {//caochangli - 用_loadUrl代替_loadId
+        // if (this._loadId != loadID || this.destroyed)
+        //     return;
+        if (this.destroyed)
             return;
 
         this._renderer.setTexture(tex);

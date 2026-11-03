@@ -38,7 +38,8 @@ export class GLoader extends GWidget {
     private _content: Sprite;
     private _srcWidth: number = 0;
     private _srcHeight: number = 0;
-    private _loadId: number = 0;
+    // private _loadId: number = 0;
+    private _loadUrl:string;//caochangli - 使用_loadUrl代替_loadId
 
     private _renderer: ImageRenderer;
     private _ani: FrameAnimation;
@@ -225,8 +226,10 @@ export class GLoader extends GWidget {
     }
 
     set texture(value: Texture) {
-        this._src = "instance-0";
-        this.onLoaded(value, ++this._loadId);
+        // caochangli - 按新加载逻辑处理
+        this._src = value && value.url || "instance-0";
+        this._cancelSrcLoad();
+        this.onLoaded(value);//, ++this._loadId);
     }
 
     /**
@@ -270,15 +273,37 @@ export class GLoader extends GWidget {
         }
 
         //本次需要的资源正在加载中 - 等待加载完成
-        if (this._srcAssetGroup && this._srcAssetGroup.IsResLoading(this._src))
-            return;
-        
+        if (this._srcAssetGroup)
+        {
+            let loadKey = this._src;
+            if (Utils.getFileExtension(loadKey) != Loader.ATLAS && URL.isAtlasInImage(loadKey))
+                loadKey = loadKey.substring(0, loadKey.lastIndexOf("/")) + ".atlas";
+            if (this._srcAssetGroup.IsResLoading(loadKey))
+                return;
+        }
+
         if (!this._srcAssetGroup)
             this._srcAssetGroup = AssetGroup.Get();
         else
-            this._srcAssetGroup.CancelAllAssets(true);
+            this._cancelSrcLoad();
 
-        let loadID = ++this._loadId;
+        //没有获取到AssetGroup - 走引擎原逻辑
+        if (!this._srcAssetGroup)
+        {
+            let loadKey = this._src;
+            let loadType = Utils.getFileExtension(loadKey) == Loader.ATLAS ? Loader.ATLAS : Loader.IMAGE;
+            if (loadType == Loader.IMAGE && URL.isAtlasInImage(loadKey))//图集中散图 - 加载图集
+            {
+                loadKey = loadKey.substring(0, loadKey.lastIndexOf("/")) + ".atlas";
+                loadType = Loader.ATLAS;
+            }
+            ILaya.loader.load(loadKey, loadType).then(() => {
+                let res = Loader.getRes(this._src);
+                this.onLoaded(<Texture | AtlasResource>res);
+            });
+            return;
+        }
+
         let tex:Texture | AtlasResource = Loader.getRes(this._src);
         
         // caochangli - 预览模式图片中散图因uuid和路径映射关系还没有,获取不到纹理问题修复
@@ -292,7 +317,8 @@ export class GLoader extends GWidget {
                 this._srcAssetGroup.OnlyAddReference(tex._atlas.url);
             else
                 this._srcAssetGroup.OnlyAddReference(tex.url,tex);
-            this.onLoaded(tex, loadID);
+            this._loadUrl = this._src;
+            this.onLoaded(tex);
         }
         else//需要加载资源
         {
@@ -308,43 +334,45 @@ export class GLoader extends GWidget {
                     if (!this.destroyed && this._src && uuid == this._src)
                     {
                         if (!srcUrl)
-                            this.onLoaded(null, loadID);
+                            this.onLoaded(null);
                         else 
-                            this._startSrcLoad(loadID,srcUrl,uuid);
+                            this._startSrcLoad(srcUrl);
                     }
                 });
             }
             //生产模式 - 没有uuid，都是用路径加载的
             else 
-                this._startSrcLoad(loadID,this._src);
+                this._startSrcLoad(this._src);
         }
     }
-    private _startSrcLoad(loadID:number,srcUrl:string,uuid?:string) {
+    private _startSrcLoad(srcUrl:string) {
         let loadUrl = srcUrl;
         let loadType = Utils.getFileExtension(srcUrl) == Loader.ATLAS ? Loader.ATLAS : Loader.IMAGE;
-        let isAtlasInImage = false;
         if (loadType == Loader.IMAGE && URL.isAtlasInImage(srcUrl))//图集中散图 - 加载图集
         {
             loadUrl = srcUrl.substring(0,srcUrl.lastIndexOf("/")) + ".atlas";
             loadType = Loader.ATLAS;
-            isAtlasInImage = true;
         }
+        this._loadUrl = loadUrl;
         this._srcAssetGroup.Load(loadUrl,loadType,this,(url:string,res:Texture | AtlasResource)=>{
-            if (url == this._src || uuid == this._src)//需要的资源正在加载中时会被挡掉，但当加载完时loadID又没对上
-                loadID = this._loadId;
-            if (isAtlasInImage && res)//图集中散图 - 转成对应散图资源
-                res = Loader.getRes(srcUrl);
-            this.onLoaded(res, loadID);
+            if (url !== this._loadUrl)
+                return;
+            if (res && URL.isAtlasInImage(this._src))//图集中散图 - 以当前src转成对应散图资源
+                res = Loader.getRes(this._src);
+            this.onLoaded(res);
         });
     }
     private _cancelSrcLoad() {
+        this._loadUrl = null;
         if (this._srcAssetGroup)
             this._srcAssetGroup.CancelAllAssets(true);
     }
     //caochangli - 走业务层资源管理器
 
-    protected onLoaded(value: Texture | AtlasResource, loadID: number) {
-        if (this._loadId != loadID || this.destroyed)
+    protected onLoaded(value: Texture | AtlasResource) {//, loadID: number) {//caochangli - 用_loadUrl代替_loadId
+        // if (this._loadId != loadID || this.destroyed)
+        //     return;
+        if (this.destroyed) 
             return;
 
         if (value instanceof Texture) {
@@ -392,7 +420,7 @@ export class GLoader extends GWidget {
     protected clearContent() {
         this._srcWidth = 0;
         this._srcHeight = 0;
-        this._loadId++;
+        // this._loadId++;//caochangli - 用_loadUrl代替_loadId
         this._renderer.setTexture(null);
         if (this._ani)
             this._ani.source = null;
