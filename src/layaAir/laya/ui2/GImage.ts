@@ -123,14 +123,14 @@ export class GImage extends GWidget {
         }
 
         //本次需要的资源正在加载中 - 等待加载完成
-        if (this._srcAssetGroup)
-        {
-            let loadKey = this._src;
-            if (URL.isAtlasInImage(loadKey))
-                loadKey = loadKey.substring(0, loadKey.lastIndexOf("/")) + ".atlas";
-            if (this._srcAssetGroup.IsResLoading(loadKey))
-                return;
-        }
+        // if (this._srcAssetGroup)
+        // {
+        //     let loadKey = this._src;
+        //     if (URL.isAtlasInImage(loadKey))
+        //         loadKey = loadKey.substring(0, loadKey.lastIndexOf("/")) + ".atlas";
+        //     if (this._srcAssetGroup.IsResLoading(loadKey))
+        //         return;
+        // }
 
         if (!this._srcAssetGroup)
             this._srcAssetGroup = AssetGroup.Get();
