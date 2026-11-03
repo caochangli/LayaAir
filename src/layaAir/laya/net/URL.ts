@@ -360,6 +360,18 @@ export class URL {
         URL.hasExtOverrides = true;
     }
 
+    /**
+     * caochangli - 是否图集中小图（利用res/atlas/目录作为判断）
+     * @param url uuid或路径
+     */
+    static isAtlasInImage(url:string):boolean {
+        if (LayaEnv.isPreview) {
+            if (Utils.isUUID(url) || url.startsWith("res://"))
+                return url.includes("@");
+        }
+        return url.includes("res/atlas/");
+    }
+
 
 //#region caochangli - FormatURL缓存
 

@@ -801,6 +801,24 @@ export class HierarchyParser {
                     addInnerUrl(fontStr, null, true);
                 }
             }
+            else if (type == "GLoader") {
+                // 支持：图集、图集中散图、单图
+                if (data.src) {
+                    if (LayaEnv.isPreview) {
+                        let index = Utils.isUUID(data.src) || data.src.startsWith("res://") ? data.src.indexOf("@") : -1;
+                        if (index != -1)//图集中散图
+                            addInnerTexture(data.src, true);
+                        else//图集本身或单图
+                            addInnerUrl(data.src, undefined, true);
+                    } 
+                    else {
+                        if (Utils.getFileExtension(data.src) == Loader.ATLAS)
+                            addInnerUrl(data.src, Loader.ATLAS, true);
+                        else
+                            addInnerTexture(data.src, true);
+                    }
+                }
+            }
         }
         function addInnerTexture(url:string,absolutePath?:boolean):string {
             if (!url) return "";
