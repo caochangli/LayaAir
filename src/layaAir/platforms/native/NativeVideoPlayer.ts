@@ -8,12 +8,12 @@ import { NativeVideoProxy } from "./NativeVideoProxy";
 
 /**
  * caochangli - 备注：Laya原始缺少一系列功能和事件
- * - 缺少功能，如：duration、volume
+ * - 缺少功能，如：duration、volume、在游戏下层
  * - 缺少事件，如：loadedmetadata、ended、error
  * 
  * 解决方案：
  * - 安卓：自定义了一套原生视频播放方式(通过NativeVideoProxy桥接)
- * - 鸿蒙：
+ * - 鸿蒙：在Laya官方VideoPlay.ets上补充功能(duration、在游戏下层、loadedmetadata、ended、error)
  * - IOS：
  */
 export class NativeVideoPlayer extends VideoPlayerBackend {
@@ -210,7 +210,9 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
         if (Browser.onAndroid || Browser.onOpenHarmonyOS) {//ios-Native代码在so中
             this._videoID = NativeVideoProxy.createVideoID();
             NativeVideoProxy.registerVideoEvent(this._videoID,this);
-            let expand = {videoID:this._videoID,volume:this._volume};
+            let expand:any = {videoID:this._videoID,volume:this._volume};
+            if (Browser.onOpenHarmonyOS)//鸿蒙 - 带上是否显示在游戏画布之下
+                expand.underGameView = !!this.options.underGameView;
             url += `[expand${JSON.stringify(expand)}expand]`;
         }
         // caochangli - 注册扩展事件、组装url扩展参数
