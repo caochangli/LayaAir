@@ -6,21 +6,24 @@ import { Browser } from "../../laya/utils/Browser";
 import { NativeVideoProxy } from "./NativeVideoProxy";
 
 /**
- * caochangli - 备注：Laya原始缺少下列功能
- * 缺少功能接口，如：duration、muted、volume、playbackRate
- * 缺少事件通知，如：error
- * 对缺少的功能采用扩展桥接的方式实现了(目前仅实现了安卓)
+ * caochangli - 备注：Laya原始缺少一系列功能和事件
+ * - 缺少功能，如：duration、muted、volume、playbackRate
+ * - 缺少事件，如：error(安卓收不到、鸿蒙可以、ios未知)
+ * 
+ * 解决方案：
+ * - 安卓：扩展LayaVideoDecoder.java类，再通过自定义桥接层补齐 “duration、muted、volume、playbackRate”功能和“error”事件
+ * - 鸿蒙&IOS：Native代码全在C++中，无法扩展只能保持Laya原始逻辑
  */
 export class NativeVideoTexture extends VideoTexture {
     readonly decoder: any;
 
-    //caochangli - 补充接口
+    //caochangli - 补充接口(安卓支持，鸿蒙&IOS不支持)
     private _videoID:string;
     private _duration:number = 0;
     private _muted: boolean = false;
     private _volume: number = 1;
     private _playbackRate: number = 1;
-    //caochangli - 补充接口
+    //caochangli - 补充接口(安卓支持，鸿蒙&IOS不支持)
 
     private _currentTime: number;
     private _ended: boolean = false;
@@ -35,7 +38,10 @@ export class NativeVideoTexture extends VideoTexture {
         });
         this.decoder.on(<any>"frame", (res: any) => {
             if (!this._destroyed) {
-                this._currentTime = res.pts / 1000; // 当前播放的进度
+                if (Browser.onOpenHarmonyOS)
+                    this._currentTime = res.pts / 1000000; // 当前播放的进度
+                else
+                    this._currentTime = res.pts / 1000; // 当前播放的进度
                 if (this._waitFirstFrame) {
                     this._waitFirstFrame = false;
                     if (!this._playing) {
@@ -51,7 +57,9 @@ export class NativeVideoTexture extends VideoTexture {
             if (!this._destroyed) {
                 // caochangli备注：
                 // Laya原始逻辑：native层播放完，js层判断循环就再次去native层创建视频播放(衔接闪烁等问题)
-                // 修改方案：安卓(ios、鸿蒙待开发)采用将loop传到native层，由native层控制，那么循环播放这里就收不到ended事件了
+                // 修改方案：
+                //     1. 安卓 - 采用将loop传到native层，由native层控制，那么循环播放这里就收不到ended事件了
+                //     2. 鸿蒙&IOS - native代码全在so文件中，无法扩展，只能保持Laya原逻辑
                 if (this._loop) {
                     this.decoder.stop().then(() => this.decoder.start(this._startOption));
                 }
@@ -79,29 +87,39 @@ export class NativeVideoTexture extends VideoTexture {
         this.decoder.seek(value * 1000);
     }
 
-    //caochangli - 补充接口(目前仅安卓支持了)
     get loop(): boolean {
         return this._loop;
     }
 
     set loop(value: boolean) {
         this._loop = value;
+        // caochangli - 备注：
+        // 安卓 - 修改成传入loop，native层自己实现循环
+        // 鸿蒙&IOS - 在js侧接收到ended事件时再去触发播放实现(官方原始逻辑)
         this.callVideoHelper("setDecoderParam",{loop:!!value});
     }
 
+    // caochangli - 补充功能
+    // 安卓 - LayaVideoDecoder.java 通过自定义桥接getPlayerInfo补充
+    // 鸿蒙&IOS - Native代码在so中，无法扩展，恒定返回0
     get duration(): number {
         return this._duration;
     }
 
+    // caochangli - 补充功能
+    // 安卓 - LayaVideoDecoder.java 通过自定义桥接getPlayerInfo补充
+    // 鸿蒙&IOS - Native代码在so中，无法扩展
     get muted(): boolean {
         return this._muted;
     }
-
     set muted(value: boolean) {
         this._muted = value;
         this.callVideoHelper("setDecoderParam",{muted:!!value});
     }
 
+    // caochangli - 补充功能
+    // 安卓 - LayaVideoDecoder.java 通过自定义桥接getPlayerInfo补充
+    // 鸿蒙&IOS - Native代码在so中，无法扩展
     get volume() {
         return this._volume;
     }
@@ -110,15 +128,16 @@ export class NativeVideoTexture extends VideoTexture {
         this.callVideoHelper("setDecoderParam",{volume:value});
     }
 
+    // caochangli - 补充功能
+    // 安卓 - LayaVideoDecoder.java 通过自定义桥接getPlayerInfo补充
+    // 鸿蒙&IOS - Native代码在so中，无法扩展
     get playbackRate(): number {
         return this._playbackRate;
     }
-
     set playbackRate(value: number) {
         this._playbackRate = value;
         this.callVideoHelper("setDecoderParam",{rate:value});
     }
-    //caochangli - 补充接口(目前仅安卓支持了)
 
     // caochangli - native环境下视频播放 - 先dcc下载到本地，再将本地路径传给native
     protected onLoad(url: string): void {
@@ -140,8 +159,21 @@ export class NativeVideoTexture extends VideoTexture {
             // 使用 dcc 把视频下载到本地，使用本地路径播放
             dccClient.updateFile(src).then((result: { isSucc: boolean, localPath: string }) => {
                 if (!this._destroyed && this._source === url) {
-                    if (result.isSucc && result.localPath)
-                        this.onLoad1(NativeVideoProxy.DCC_LOCAL_PATCH_TAG + result.localPath);
+                    if (result.isSucc && result.localPath) {
+                        // C++桥接层会给非http开头的url拼接上dcc前缀：
+                        // 如 res/video/test.mp4 经C++拼接 https://projectq-client.sanguosha.com/dev_month/res/video/test.mp4
+                        // 而本地路径非http开头，被拼上http后，变成到远程去下载了 - 需要做处理绕过C++拼前缀，又要native真正读取本地文件播放
+                        // this.onLoad1(NativeVideoProxy.DCC_LOCAL_PATCH_TAG + result.localPath);
+                        if (Browser.onAndroid)
+                            this.onLoad1("file://" + result.localPath);
+                        // 鸿蒙沙雕 - so中写死了只有这个前缀的才满足不拼dcc前缀，又能走到layadcc._jsdown方法中
+                        else if (Browser.onOpenHarmonyOS)
+                            this.onLoad1("http://stand.alone.version/" + src);
+                        else if (Browser.onIOS)
+                            this.onLoad1("file://" + result.localPath);
+                        else
+                            this.onLoad1("file://" + result.localPath);
+                    }
                     else
                         this.onLoad1(src);
                 }
@@ -177,10 +209,12 @@ export class NativeVideoTexture extends VideoTexture {
         //     return;
 
         // caochangli - 注册扩展事件、组装url扩展参数
-        this._videoID = NativeVideoProxy.createVideoID();
-        NativeVideoProxy.registerVideoEvent(this._videoID,this);
-        let expand = {videoID:this._videoID,loop:!!this._loop,muted:!!this._muted,volume:this._volume,rate:this._playbackRate};
-        url += `[expand${JSON.stringify(expand)}expand]`;
+        if (Browser.onAndroid) {//仅安卓 - 鸿蒙、IOS：Native代码全在C++中，无法扩展只能保持Laya原始逻辑
+            this._videoID = NativeVideoProxy.createVideoID();
+            NativeVideoProxy.registerVideoEvent(this._videoID,this);
+            let expand = {videoID:this._videoID,loop:!!this._loop,muted:!!this._muted,volume:this._volume,rate:this._playbackRate};
+            url += `[expand${JSON.stringify(expand)}expand]`;
+        }
         // caochangli - 注册扩展事件、组装url扩展参数
 
         this._startOption = {};
@@ -196,8 +230,10 @@ export class NativeVideoTexture extends VideoTexture {
                     this._waitFirstFrame = true;
             }
         }).catch((err: any) => {
+            // 错误返回，如：视频源不存在等
+            // 但：安卓收不到catch(通过自定义handleEvent桥接解决)，鸿蒙能收到,IOS待定
             if (!this._destroyed) {
-                console.warn("MgVideoTexture: " + err.message);
+                console.warn("MgVideoTexture: " + (err && err.message ? err.message : ""));
                 this.event("error",err);
             }
         });
@@ -209,8 +245,9 @@ export class NativeVideoTexture extends VideoTexture {
             super.onBlur();
     }
 
-    /**caochangli - 获取视频信息 */
+    /**caochangli - 获取视频信息(安卓视频功能调用) */
     private getDecoderInfo() {
+        if (!Browser.onAndroid) return;
         try {
             let json = this.callVideoHelper("getDecoderInfo");
             if (!json) {
@@ -224,7 +261,7 @@ export class NativeVideoTexture extends VideoTexture {
         catch (e) { }
     }
 
-    /**调用native方法 - 目前仅处理了安卓 */
+    /**调用native方法 - 安卓 */
     private callVideoHelper(method:string,param:any = null) {
         if (!Browser.onAndroid) return null;
         if (!method || !this._videoID) return null;
@@ -233,7 +270,7 @@ export class NativeVideoTexture extends VideoTexture {
         return NativeVideoProxy.callVideoHelper(method,param);
     }
 
-    /**native回调 */
+    /**native回调 - LayaVideoDecoder.java的扩展事件 */
     handleEvent(ret:string, msg:any) {                     
         if (this._destroyed)
             return;

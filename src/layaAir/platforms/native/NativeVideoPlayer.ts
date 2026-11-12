@@ -7,12 +7,14 @@ import { getErrorMsg } from "../../laya/utils/Error";
 import { NativeVideoProxy } from "./NativeVideoProxy";
 
 /**
- * caochangli - 备注：Laya原始缺少下列功能
- * 缺少功能接口，如：duration、volume
- * 缺少事件通知，如：loadedmetadata、ended、error
- * 对缺少的功能采用扩展桥接的方式实现了(目前仅实现了安卓)
+ * caochangli - 备注：Laya原始缺少一系列功能和事件
+ * - 缺少功能，如：duration、volume
+ * - 缺少事件，如：loadedmetadata、ended、error
  * 
- * 同时自定义了一套原生视频播放方式(通过NativeVideoProxy桥接，目前仅实现了安卓)
+ * 解决方案：
+ * - 安卓：自定义了一套原生视频播放方式(通过NativeVideoProxy桥接)
+ * - 鸿蒙：
+ * - IOS：
  */
 export class NativeVideoPlayer extends VideoPlayerBackend {
     readonly video: any;
@@ -24,8 +26,8 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
     private _playbackRate: number = 1;
 
     //caochangli - 补充接口
-    private _videoID:string;
     private _duration:number = 0;
+    private _videoID:string;
     private _isCustomVideo:boolean;
     //caochangli - 补充接口
 
@@ -45,7 +47,15 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
 
     get currentTime(): number {
         if (this.video)
+        {
+            // caochangli - 鸿蒙：使用自定义桥接getPlayerInfo功能补充
+            if (Browser.onOpenHarmonyOS) {
+                let info = this.getPlayerInfo();
+                return info && info.currentTime ? info.currentTime / 1000 : 0.0;
+            }
+            // 安卓 - LayaVideoPlayer.java、NativeVideoProxy.ts(QGVideoHelper.java)
             return this.video.tell();
+        }
         return 0.0;
     }
 
@@ -54,7 +64,11 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
             this.video.seek(value * 1000);
     }
 
-    //caochangli - 补充接口(目前仅安卓支持了)
+    // caochangli - 补充功能
+    // 安卓 - LayaVideoPlayer.java 通过自定义桥接getPlayerInfo补充
+    // 安卓 - QGVideoView.java 自定义视频播放功能支持
+    // 鸿蒙 - VideoPlayer.ets 通过自定义桥接getPlayerInfo补充
+    // IOS - 待定
     get duration(): number {
         if (this._isCustomVideo) {
             if (this.video)
@@ -73,28 +87,42 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
             this.video.muted = value;
     }
 
-    //caochangli - 补充接口(目前仅安卓支持了)
+    //caochangli - 备注：
+    // 安卓 - LayaVideoPlayer.java 通过自定义桥接补充
+    // 安卓 - QGVideoView.java 自定义视频播放功能支持
+    // 鸿蒙 - 没有音量设置功能
+    // IOS -  待定
     get volume() {
         return this._volume;
     }
     set volume(value:number) {
         this._volume = value;
-        if (this._isCustomVideo) {
-            if (this.video)
-                this.video.volume = value;
-        }
-        else
+        if (!this.video) return;
+        if (Browser.onOpenHarmonyOS) return;// 鸿蒙没有音量设置功能
+        if (this._isCustomVideo)
+            this.video.volume = value;
+        else if (Browser.onAndroid)
             this.callVideoHelper("setPlayerParam",{volume:value});
+        else
+            this.video.volume = value;
     }
 
+    //caochangli - 备注：
+    // 安卓 - LayaVideoPlayer.java、QGVideoView.java 均支持
+    // 鸿蒙 - 只支持 0.75 / 1.0 / 1.25 / 1.75 / 2.0
+    // IOS -  待定
     get playbackRate(): number {
         return this._playbackRate;
     }
-
     set playbackRate(value: number) {
         this._playbackRate = value;
-        if (this.video)
-            this.video.playbackRate = value;
+        if (this.video) {
+            // 鸿蒙 - 入参是挡位式的，C++侧直接没实现这个接口(通过自定义桥接实现，Native层已做挡位就近保护)
+            if (Browser.onOpenHarmonyOS)
+                this.callVideoHelper("setPlaybackRate", { rate: value });
+            else
+                this.video.playbackRate = value;
+        }       
     }
     
     // caochangli - native环境下视频播放 - 先dcc下载到本地，再将本地路径传给native
@@ -116,8 +144,21 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
         // 使用dcc下载文件到本地，使用本地路径播放
         dccClient.updateFile(src).then((result:{isSucc:boolean,localPath:string}) => {
             if (this._owner && this._source === url) {
-                if (result.isSucc && result.localPath)
-                    this.onLoad1(NativeVideoProxy.DCC_LOCAL_PATCH_TAG + result.localPath);
+                if (result.isSucc && result.localPath) {
+                    // C++桥接层会给非http开头的url拼接上dcc前缀：
+                    // 如 res/video/test.mp4 经C++拼接 https://projectq-client.sanguosha.com/dev_month/res/video/test.mp4
+                    // 而本地路径非http开头，被拼上http后，变成到远程去下载了 - 需要做处理绕过C++拼前缀，又要native真正读取本地文件播放
+                    // this.onLoad1(NativeVideoProxy.DCC_LOCAL_PATCH_TAG + result.localPath);
+                    if (Browser.onAndroid)
+                        this.onLoad1("file://" + result.localPath);
+                    // 鸿蒙 - 在videoPlayer.ets setURL方法中反向解析
+                    else if (Browser.onOpenHarmonyOS)
+                        this.onLoad1("file://" + result.localPath);
+                    else if (Browser.onIOS)
+                        this.onLoad1("file://" + result.localPath);
+                    else
+                        this.onLoad1("file://" + result.localPath);
+                }
                 else
                     this.onLoad1(src);
             }
@@ -161,12 +202,17 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
             return;
         }
 
-        // ======Laya官方视频播放
+        // ======================= Laya官方视频播放 =======================
+        // 安卓&鸿蒙 - 通过自定义桥接层补充缺失功能
+        // IOS - 待定
+
         // caochangli - 注册扩展事件、组装url扩展参数
-        this._videoID = NativeVideoProxy.createVideoID();
-        NativeVideoProxy.registerVideoEvent(this._videoID,this);
-        let expand = {videoID:this._videoID,volume:this._volume};
-        url += `[expand${JSON.stringify(expand)}expand]`;
+        if (Browser.onAndroid || Browser.onOpenHarmonyOS) {//ios-Native代码在so中
+            this._videoID = NativeVideoProxy.createVideoID();
+            NativeVideoProxy.registerVideoEvent(this._videoID,this);
+            let expand = {videoID:this._videoID,volume:this._volume};
+            url += `[expand${JSON.stringify(expand)}expand]`;
+        }
         // caochangli - 注册扩展事件、组装url扩展参数
 
         (<Mutable<this>>this).video = PAL.g.createVideo(Object.assign({},
@@ -192,36 +238,40 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
             }
         });
 
-        if (!Browser.onAndroid) {//caochangli - 安卓时机不对，放到扩展事件调用
+        //caochangli - 安卓&鸿蒙时机不对，放到扩展事件调用
+        if (!Browser.onAndroid && !Browser.onOpenHarmonyOS)
             this.setLoaded();
-        }
     }
 
-    /**caochangli - 获取视频信息 */
-    private getPlayerInfo() {
+    /**caochangli - 获取视频信息(安卓&鸿蒙Laya官方视频功能调用) */
+    private getPlayerInfo():Record<string,any> {
         try {
             let json = this.callVideoHelper("getPlayerInfo");
             if (!json) {
                 console.warn("[QG-Video-Bridge] player not bound", this._videoID);
-                return;
+                return null;
             }
             let info = JSON.parse(json);
             if (info.duration > 0)
                 this._duration = info.duration / 1000;
+            return info;
         }
         catch (e) { }
+        return null;
     }
 
-    /**调用native方法 - 目前仅处理了安卓 */
+    /**调用native方法 - 安卓&鸿蒙 */
     private callVideoHelper(method:string,param:any = null) {
-        if (!Browser.onAndroid) return null;//目前仅实现了安卓
-        if (!method || !this._videoID) return null;
-        if (!param) param = {};
-        param.id = this._videoID;
-        return NativeVideoProxy.callVideoHelper(method,param);
+        if (Browser.onAndroid || Browser.onOpenHarmonyOS) {
+            if (!method || !this._videoID) return null;
+            if (!param) param = {};
+            param.id = this._videoID;
+            return NativeVideoProxy.callVideoHelper(method,param);
+        }
+        return null;
     }
     
-    /**native回调 - LayaVideoPlayer.java的扩展事件 */
+    /**native回调 - LayaVideoPlayer.java、VideoPlayer.ets的扩展事件 */
     handleEvent(ret:string, msg:any) {                     
         if (!this._owner)
             return;
