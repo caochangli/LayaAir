@@ -1,69 +1,28 @@
 import { IVideoPlayerOptions } from "../../laya/media/VideoPlayerBackend";
 import { Browser } from "../../laya/utils/Browser";
 
-// var videoEventRegistered = false;
-// var videoIdSeed = 0;
-// const videoProxyMap = new Map();
-
-// const QG_VIDEO_HELPER_CLASS = "com.yoka.dgxj.libs.QGVideoHelper";
-
-// /** 视频桥统一入口：返回值为被调方法的结果（create/getInfo 返回字符串，void 返回 ""） */
-// function callVideoHelper(method:string, param:any) {
-//     return (Browser.window as any).conch.postSyncMessage(method, JSON.stringify({
-//         className: QG_VIDEO_HELPER_CLASS,
-//         args: [JSON.stringify(param)]
-//     }));
-// }
-
-// function fitStrToInt(fit:string) {
-//     if (fit === "fill")
-//         return 0;
-//     if (fit === "cover")
-//         return 2;
-//     return 1;
-// }
-
-// function createVideoID() {
-//     return "video_" + (++videoIdSeed);
-// }
-
-// /** 注册 QGVideoHelper.onVideoEvent 回调（CallBackToJS 按 类名+方法名 匹配） */
-// function registerVideoBridge() {
-//     if (!videoEventRegistered) {
-//         let cls = (Browser.window as any).PlatformClass.createClass(QG_VIDEO_HELPER_CLASS);
-//         cls.callWithBack(dispatchVideoEvent, "onVideoEvent");
-//         videoEventRegistered = true;
-//     }
-//     return true;
-// }
-
-// function dispatchVideoEvent(json:string) {
-//     try {
-//         let info = JSON.parse(json || "{}");
-//         if (info.name !== QG_VIDEO_HELPER_CLASS)
-//             return;
-//         let msg = JSON.parse(info.msg || "{}");
-//         let proxy = videoProxyMap.get(msg.id);
-//         if (proxy)
-//             proxy.handleEvent(info.ret, msg);
-//     }
-//     catch (e) {
-//         console.error("[QG-Video-Bridge] dispatchVideoEvent error", e, json);
-//     }
-// }
-
 /**
  * native视频播放代理类
  */
 export class NativeVideoProxy {
 
 //静态方法-------------------
-    static DCC_LOCAL_PATCH_TAG:string = "[dccLocalPath]";
-    static VIDEO_HELPER_CLASS = "com.yoka.dgxj.libs.QGVideoHelper";
+    // static DCC_LOCAL_PATCH_TAG:string = "[dccLocalPath]";
+    static VIDEO_ANDROID_CLASS = "com.yoka.dgxj.libs.QGVideoHelper";
+    static VIDEO_HARMONRY_CLASS = "Harmonry.VideoPlayer";
 
     private static videoEventRegistered:boolean = false;
     private static videoIdSeed:number = 0;
     private static videoProxyMap = new Map();
+
+    /**获取视频桥接类 */
+    static get videoClass():string {
+        if (Browser.onAndroid)
+            return this.VIDEO_ANDROID_CLASS;
+        if (Browser.onOpenHarmonyOS)
+            return this.VIDEO_HARMONRY_CLASS;
+        return "";
+    }
 
     /**创建桥接视频ID */
     static createVideoID() {
@@ -73,7 +32,7 @@ export class NativeVideoProxy {
     /** 视频桥接接口：js -> native */
     static callVideoHelper(method:string, param:any) {
         return (Browser.window as any).conch.postSyncMessage(method, JSON.stringify({
-            className: this.VIDEO_HELPER_CLASS,
+            className: this.videoClass,
             args: [JSON.stringify(param)]
         }));
     }
@@ -86,7 +45,7 @@ export class NativeVideoProxy {
     static registerVideoEvent(videoID:string,obj:any) {
         this.videoProxyMap.set(videoID,obj);
         if (!this.videoEventRegistered) {
-            let cls = (Browser.window as any).PlatformClass.createClass(this.VIDEO_HELPER_CLASS);
+            let cls = (Browser.window as any).PlatformClass.createClass(this.videoClass);
             cls.callWithBack(this.dispatchVideoEvent, "onVideoEvent");
             this.videoEventRegistered = true;
         }
@@ -105,7 +64,7 @@ export class NativeVideoProxy {
     static dispatchVideoEvent(json:string) {
         try {
             let info = JSON.parse(json || "{}");
-            if (info.name !== NativeVideoProxy.VIDEO_HELPER_CLASS)
+            if (info.name !== NativeVideoProxy.videoClass)
                 return;
             let msg = JSON.parse(info.msg || "{}");
             let proxy = NativeVideoProxy.videoProxyMap.get(msg.id);
@@ -133,15 +92,8 @@ export class NativeVideoProxy {
         this._videoID = NativeVideoProxy.createVideoID();
         this._owner = owner;
 
-        // 本地dcc资源 - 去掉本地标记 
-        let tag = NativeVideoProxy.DCC_LOCAL_PATCH_TAG;
-        if (src.includes(tag)) {
-            let index = src.indexOf(tag);
-            if (index >= 0)
-                src = src.substring(index + tag.length);
-        } 
         // 远程资源 - 拼接上dcc url前缀
-        else {
+        if (!src.startsWith("https://") && !src.startsWith("http://") && !src.startsWith("file:")) {
             let dccClient = (window as any).dcc;
             if (dccClient && dccClient._pathMapToDCC)
                 src = dccClient._pathMapToDCC + src;
@@ -231,7 +183,7 @@ export class NativeVideoProxy {
 
     get currentTime() {
         let videoInfo = this.getPlayerInfo();
-        return videoInfo ? videoInfo.current / 1000 : 0;
+        return videoInfo ? videoInfo.current / 1000 : 0.0;
     }
 
     get duration() {
