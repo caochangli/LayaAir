@@ -19,16 +19,17 @@ export class HTMLVideoPlayer extends VideoPlayerBackend {
 
         // caochangli - 补充视频事件
         this.element.addEventListener("loadedmetadata", () => {
-            if (this._owner)
-                this.setLoaded();
+            if (!this._owner) return;
+            this.setLoaded();
         });
         this.element.addEventListener("ended", () => {
-            if (this._owner)
-                this._owner.event("ended");
+            if (!this._owner || this.loop) return;
+            this.setEnded();
+            this._owner.event("ended");
         });
         this.element.addEventListener("error", (err:any)=> {
-            if (this._owner)
-                this._owner.event("error",err);
+            if (!this._owner) return;
+            this._owner.event("error",err);
         },true);
         // caochangli - 补充视频事件
     }

@@ -12,6 +12,12 @@ import { HideFlags } from "../Const";
  * @zh VideoNode将视频显示到Canvas上。Video可能不会在所有平台有效。
  * 在PC端可以在任何时机调用play()，因此可以在程序开始运行时就使Video开始播放。
  * 但是在移动端，只有在用户第一次触碰屏幕后才可以调用play()，所以移动端不可能在程序开始运行时就自动开始播放Video。
+ * 
+ * @caochangli 附加说明：
+ * - 1. 单次播放结束后会触发BUG：再次play无法继续播放，切后台再回前台又重新播放了
+ **    - 原因：单次播放结束时未重置_playing状态、移除BLUR事件和渲染定时器。导致 ”再次play因_playing=true被拦截；未移除BLUR事件进后台pause(_playing=false)、回前台play重新播放了“
+ **    - 解决：videoTexture、VideoPlayerBackend两个类新增ended方法，子类在单次播放结束时调用ended方法重置状态，同时子类需要在onPlay中重置_ended = false，部分平台已修复，使用时还需逐个平台验证
+ * - 2. 解码器、播放器两种模式不是所有平台都支持，即便特定平台支持也可能缺失部分功能，如：鸿蒙解码器模式缺失(duration、muted、volume、playbackRate、error事件等)，鸿蒙播放器模式音量设置只能特定几个挡位等等 
  */
 export class VideoNode extends Sprite {
     private _comp: VideoPlayer;

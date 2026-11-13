@@ -24,20 +24,20 @@ export class HTMLVideoTexture extends VideoTexture {
                 this.setLoaded(this.element.videoWidth, this.element.videoHeight, Browser.onLayaRuntime);
         });
         ele.addEventListener("canplay", () => {
-            if (!this._destroyed) {
-                //让画面显示出来，而不是黑色
-                if (!this._playing)
-                    this.render(true);
-            }
+            if (this._destroyed) return;
+            //让画面显示出来，而不是黑色
+            if (!this._playing)
+                this.render(true);
         });
         ele.addEventListener("ended", () => {
-            if (!this._destroyed)
-                this.event("ended");
+            if (this._destroyed || this._loop) return;
+            this.setEnded();
+            this.event("ended");
         });
         // caochangli - 补充视频事件
         ele.addEventListener("error", (err:any) => {
-            if (!this._destroyed)
-                this.event("error",err);
+            if (this._destroyed) return;
+            this.event("error",err);
         },true);
         // caochangli - 补充视频事件
 

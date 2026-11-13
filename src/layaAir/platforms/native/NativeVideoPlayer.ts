@@ -183,21 +183,19 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
                 this.getNodeTransform(),
                 url,this._playing,this._loop,this._muted,this.volume,this._playbackRate);
             this.video.onEnded(() => {
-                if (this._owner) {
-                    this._ended = true;
-                    this._owner.event("ended");
-                }
+                if (!this._owner || this._loop) return;
+                this._ended = true;
+                this.setEnded();
+                this._owner.event("ended");
             });
             this.video.onError((err: any) => {
-                if (this._owner) {
-                    console.error("NativeVideoPlayer: " + getErrorMsg(err));
-                    this._owner.event("error",err);
-                }
+                if (!this._owner) return;
+                console.error("NativeVideoPlayer: " + getErrorMsg(err));
+                this._owner.event("error",err);
             });
             this.video.onReady(() => {
-                if (this._owner) {
-                    this.setLoaded();
-                }
+                if (!this._owner) return;
+                this.setLoaded();
             });
             return;
         }
@@ -227,22 +225,23 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
                 muted: this._muted,
                 playbackRate: this._playbackRate,
             }));
-        this.video.onEnded(() => {//caochangli - 安卓没有回调，采用扩展方式实现
-            if (this._owner) {
+
+        // caochangli - 安卓&鸿蒙 ended、error事件收不到，采用扩展桥接实现，在扩展桥接的loadedmetadata事件中执行setLoaded
+        if (!Browser.onAndroid && !Browser.onOpenHarmonyOS) {
+            this.video.onEnded(() => {
+                if (!this._owner || this._loop) return;
                 this._ended = true;
+                this.setEnded();
                 this._owner.event("ended");
-            }
-        });
-        this.video.onError((err: any) => {//caochangli - 安卓没有回调，采用扩展方式实现
-            if (this._owner) {
+                
+            });
+            this.video.onError((err: any) => {
+                if (!this._owner) return;
                 console.error("NativeVideoPlayer: " + getErrorMsg(err));
                 this._owner.event("error",err);
-            }
-        });
-
-        //caochangli - 安卓&鸿蒙时机不对，放到扩展事件调用
-        if (!Browser.onAndroid && !Browser.onOpenHarmonyOS)
+            });
             this.setLoaded();
+        }
     }
 
     /**caochangli - 获取视频信息(安卓&鸿蒙Laya官方视频功能调用) */
@@ -285,8 +284,9 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
             case "canplay": //首帧已渲染
                 break;
             case "ended": //播放结束
-                if (this._owner) {
+                if (this._owner && !this._loop) {
                     this._ended = true;
+                    this.setEnded();
                     this._owner.event("ended");
                 }
                 break;
@@ -298,8 +298,10 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
     }
 
     protected onPlay(): void {
-        if (this.video)
+        if (this.video) {
+            this._ended = false;
             this.video.play();
+        }       
     }
 
     protected onPause(): void {
@@ -323,7 +325,7 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
             this.video.height = height;
         }
     }
-
+    
     protected onBlur() {
         // native安卓 - 前后台切换暂停、恢复视频在native层已实现
         if (!Browser.onAndroid)

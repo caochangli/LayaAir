@@ -20,6 +20,7 @@ export class WxVideoTexture extends VideoTexture {
             type: "wemedia" // 3.0.0以上基础库支持传入type参数
         });
         this.decoder.on(<any>"frame", (res) => {
+            if (this._destroyed) return;
             this._currentTime = res.pts / 1000; // 当前播放的进度
             if (this._waitFirstFrame) {
                 this._waitFirstFrame = false;
@@ -32,10 +33,15 @@ export class WxVideoTexture extends VideoTexture {
             }
         });
         this.decoder.on("ended", () => {
-            if (this._loop)
-                this.decoder.stop().then(() => this.decoder.start(this._startOption));
+            if (this._destroyed) return;
+            if (this._loop) {
+                this.decoder.stop().then(() => {
+                    if (!this._destroyed) this.decoder.start(this._startOption);
+                });
+            }
             else {
                 this._ended = true;
+                this.setEnded();
                 this.event("ended");
             }
         });
@@ -84,7 +90,14 @@ export class WxVideoTexture extends VideoTexture {
 
     protected onPlay(): void {
         //@ts-ignore
-        this.decoder.wait(false);
+        if (this._ended) {
+            this._ended = false;
+            this.decoder.stop().then(() => {
+                if (!this._destroyed) this.decoder.start(this._startOption);
+            });
+            return;
+        }
+        (this.decoder as any).wait(false);
     }
 
     protected onPause(): void {

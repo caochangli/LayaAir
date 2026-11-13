@@ -37,36 +37,37 @@ export class NativeVideoTexture extends VideoTexture {
             type: "wemedia" // 3.0.0以上基础库支持传入type参数
         });
         this.decoder.on(<any>"frame", (res: any) => {
-            if (!this._destroyed) {
-                if (Browser.onOpenHarmonyOS)
-                    this._currentTime = res.pts / 1000000; // 当前播放的进度
-                else
-                    this._currentTime = res.pts / 1000; // 当前播放的进度
-                if (this._waitFirstFrame) {
-                    this._waitFirstFrame = false;
-                    if (!this._playing) {
-                        //让画面显示出来，而不是黑色
-                        this.render(true);
-                        //@ts-ignore
-                        this.decoder.wait(true);
-                    }
+            if (this._destroyed) return;
+            if (Browser.onOpenHarmonyOS)
+                this._currentTime = res.pts / 1000000; // 当前播放的进度
+            else
+                this._currentTime = res.pts / 1000; // 当前播放的进度
+            if (this._waitFirstFrame) {
+                this._waitFirstFrame = false;
+                if (!this._playing) {
+                    //让画面显示出来，而不是黑色
+                    this.render(true);
+                    //@ts-ignore
+                    this.decoder.wait(true);
                 }
             }
         });
         this.decoder.on("ended", () => {
-            if (!this._destroyed) {
-                // caochangli备注：
-                // Laya原始逻辑：native层播放完，js层判断循环就再次去native层创建视频播放(衔接闪烁等问题)
-                // 修改方案：
-                //     1. 安卓 - 采用将loop传到native层，由native层控制，那么循环播放这里就收不到ended事件了
-                //     2. 鸿蒙&IOS - native代码全在so文件中，无法扩展，只能保持Laya原逻辑
-                if (this._loop) {
-                    this.decoder.stop().then(() => this.decoder.start(this._startOption));
-                }
-                else {
-                    this._ended = true;
-                    this.event("ended");
-                }
+            if (this._destroyed) return;
+            // caochangli备注：
+            // Laya原始逻辑：native层播放完，js层判断循环就再次去native层创建视频播放(衔接闪烁等问题)
+            // 修改方案：
+            //     1. 安卓 - 采用将loop传到native层，由native层控制，那么循环播放这里就收不到ended事件了
+            //     2. 鸿蒙&IOS - native代码全在so文件中，无法扩展，只能保持Laya原逻辑
+            if (this._loop) {
+                this.decoder.stop().then(() => {
+                    if (!this._destroyed) this.decoder.start(this._startOption);
+                });
+            }
+            else {
+                this._ended = true;
+                this.setEnded();
+                this.event("ended");
             }
         });
     }
@@ -290,6 +291,13 @@ export class NativeVideoTexture extends VideoTexture {
 
     protected onPlay(): void {
         //@ts-ignore
+        if (this._ended) {
+            this._ended = false;
+            this.decoder.stop().then(() => {
+                if (!this._destroyed) this.decoder.start(this._startOption);
+            });
+            return;
+        }
         this.decoder.wait(false);
     }
 

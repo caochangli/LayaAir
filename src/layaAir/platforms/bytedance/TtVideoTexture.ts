@@ -15,17 +15,20 @@ export class TtVideoTexture extends VideoTexture {
 
         this.decoder = PAL.g.createOffscreenVideo();
         this.decoder.onCandraw((aspectRatio: number) => {
-            if (this._loaded)
+            if (this._destroyed || this._loaded)
                 return;
 
             this.setLoaded(1080 * aspectRatio, 1080, true);
         });
         this.decoder.onCanplay(() => {
+            if (this._destroyed) return;
             if (this._playing)
                 this.decoder.play();
         });
         this.decoder.onEnded(() => {
+            if (this._destroyed || this._loop) return;
             this._ended = true;
+            this.setEnded();
             this.event("ended");
         });
     }
@@ -97,6 +100,7 @@ export class TtVideoTexture extends VideoTexture {
     }
 
     protected onPlay(): void {
+        this._ended = false;
         this.decoder.play();
     }
 

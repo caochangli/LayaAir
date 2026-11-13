@@ -75,14 +75,24 @@ export class MgVideoPlayer extends VideoPlayerBackend {
                 muted: this._muted,
                 playbackRate: this._playbackRate,
             }));
-        this.video.onEnded(() => this._ended = true);
+        this.video.onEnded(() => {
+            if (!this._owner || this._loop) return;
+            this._ended = true;
+            this.setEnded();
+            this._owner.event("ended");
+        });
         this.video.onError((err) => {
+            if (!this._owner) return;
             console.error("MgVideoPlayer: " + getErrorMsg(err));
         });
         this.setLoaded();
     }
 
     protected onPlay(): void {
+        if (this._ended) {
+            this._ended = false;
+            // this.video.seek(0);//待定
+        }
         this.video.play();
     }
 

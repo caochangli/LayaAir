@@ -25,6 +25,9 @@ export class VideoTexture extends BaseTexture {
     allowBackground: boolean = false;
 
     protected _source: string;
+    /**caochangli - 播放中状态：单次播放结束没有重置，导致“再次调用play无效，且前后台切换又再次播放”BUG
+     * - 新增setEnded()方法，子类在播放结束时调用，修复上述BUG
+     */
     protected _playing: boolean = false;
     protected _loaded: boolean = false;
     protected _frameRender: boolean = true;
@@ -278,6 +281,18 @@ export class VideoTexture extends BaseTexture {
         this.event(Event.READY, this);
     }
 
+    /**caochangli - 设置播放结束，子类调用通知 */
+    protected setEnded() {
+        if (this._loop) return;
+        // 重置播放状态 - 修复播放结束的视频，再次play()能重新播放
+        this._playing = false;
+        this._autoResume = false;
+        // 取消前后台切换事件监听 - 修复播放结束的视频，前后台切换时重新播放BUG
+        ILaya.stage.off(Event.BLUR, this, this.onBlur);
+        // 清理渲染定时器
+        ILaya.timer.clear(this, this.render);
+    }
+
     /**
      * @internal
      */
@@ -388,12 +403,18 @@ export class VideoTexture extends BaseTexture {
     destroy() {
         this._source = null;
         this._playing = false;
+        this._autoResume = false;
         ILaya.timer.clear(this, this.render);
         ILaya.stage.off(Event.BLUR, this, this.onBlur);
         this.onDestroy();
         super.destroy();
     }
 
+    /**进入后台 - play方法中开启监听
+     * - autoPlay=false不主动播放：还没开启监听，前后台切换不会导致播放了
+     * - pause()已暂停：会移除监听，前后台切换不会导致播放了  
+     * - 单次播放结束：未调用setEnded时监听还在，前后台切换会导致又播放了
+     */
     protected onBlur() {
         if (!this.allowBackground)
             PAL.media.resumeUntilGotFocus(this);
