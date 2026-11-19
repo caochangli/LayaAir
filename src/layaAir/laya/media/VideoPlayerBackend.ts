@@ -160,6 +160,13 @@ export class VideoPlayerBackend {
     set playbackRate(value: number) {
     }
 
+    /** caochangli - 安卓&IOS Native播放器模式自己实现了一套，默认使用自己实现的一套，若要使用Laya官方的通过此接口设置 */
+    get useLayaNativePlayer(): boolean {
+        return false;
+    }
+    set useLayaNativePlayer(value: boolean) {
+    }
+
     /**
     * @en If the video is paused
     * @zh 视频是否暂停

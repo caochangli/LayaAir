@@ -222,6 +222,14 @@ export class VideoNode extends Sprite {
         this._comp.muted = value;
     }
 
+    /** caochangli - 安卓&IOS Native播放器模式自己实现了一套，默认使用自己实现的一套，若要使用Laya官方的通过此接口设置 */
+    get useLayaNativePlayer(): boolean {
+        return this._comp.useLayaNativePlayer;
+    }
+    set useLayaNativePlayer(value: boolean) {
+        this._comp.useLayaNativePlayer = value;
+    }
+
     /**
      * @en If the video is paused.
      * @zh 视频是否暂停。

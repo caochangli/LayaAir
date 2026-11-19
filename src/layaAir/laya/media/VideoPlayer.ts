@@ -41,6 +41,9 @@ export class VideoPlayer extends Component {
     private _paused: boolean = false;
     private _textureCmd: DrawTextureCmd;
 
+    /** caochangli - 新增切换Native播放器模式 Laya和自定义两套视频功能 */
+    private _useLayaNativePlayer:boolean = false;
+
     /** @ignore */
     declare owner: Sprite;
 
@@ -237,6 +240,16 @@ export class VideoPlayer extends Component {
             this._api.muted = value;
     }
 
+    /** caochangli - 安卓&IOS Native播放器模式自己实现了一套，默认使用自己实现的一套，若要使用Laya官方的通过此接口设置 */
+    get useLayaNativePlayer(): boolean {
+        return this._useLayaNativePlayer;
+    }
+    set useLayaNativePlayer(value: boolean) {
+        this._useLayaNativePlayer = value;
+        if (this._api)
+            this._api.useLayaNativePlayer = value;
+    }
+
     /**
      * @en If the video is paused.
      * @zh 视频是否暂停。
@@ -330,6 +343,7 @@ export class VideoPlayer extends Component {
         this._api.muted = this._muted;
         this._api.playbackRate = this._playbackRate;
         this._api.allowBackground = this._allowBackground;
+        this._api.useLayaNativePlayer = this._useLayaNativePlayer;
         if (this._autoPlay && !this._paused && LayaEnv.isPlaying)
             this._api.play();
         else

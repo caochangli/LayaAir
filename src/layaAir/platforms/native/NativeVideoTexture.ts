@@ -8,10 +8,10 @@ import { NativeVideoProxy } from "./NativeVideoProxy";
 /**
  * caochangli - 备注：Laya原始缺少一系列功能和事件
  * - 缺少功能，如：duration、muted、volume、playbackRate
- * - 缺少事件，如：error(安卓收不到、鸿蒙可以、ios未知)
+ * - 缺少事件，如：error(安卓&IOS收不到、鸿蒙可以)
  * 
  * 解决方案：
- * - 安卓：扩展LayaVideoDecoder.java类，再通过自定义桥接层补齐 “duration、muted、volume、playbackRate”功能和“error”事件
+ * - 安卓：扩展LayaVideoDecoder.java类再通过自定义桥补齐 “duration、muted、volume、playbackRate”功能和“error”事件
  * - 鸿蒙&IOS：Native代码全在C++中，无法扩展只能保持Laya原始逻辑
  */
 export class NativeVideoTexture extends VideoTexture {
@@ -101,14 +101,14 @@ export class NativeVideoTexture extends VideoTexture {
     }
 
     // caochangli - 补充功能
-    // 安卓 - LayaVideoDecoder.java 通过自定义桥接getPlayerInfo补充
+    // 安卓 - LayaVideoDecoder.java 通过自定义桥getPlayerInfo补充
     // 鸿蒙&IOS - Native代码在so中，无法扩展，恒定返回0
     get duration(): number {
         return this._duration;
     }
 
     // caochangli - 补充功能
-    // 安卓 - LayaVideoDecoder.java 通过自定义桥接getPlayerInfo补充
+    // 安卓 - LayaVideoDecoder.java 通过自定义桥getPlayerInfo补充
     // 鸿蒙&IOS - Native代码在so中，无法扩展
     get muted(): boolean {
         return this._muted;
@@ -119,7 +119,7 @@ export class NativeVideoTexture extends VideoTexture {
     }
 
     // caochangli - 补充功能
-    // 安卓 - LayaVideoDecoder.java 通过自定义桥接getPlayerInfo补充
+    // 安卓 - LayaVideoDecoder.java 通过自定义桥getPlayerInfo补充
     // 鸿蒙&IOS - Native代码在so中，无法扩展
     get volume() {
         return this._volume;
@@ -130,7 +130,7 @@ export class NativeVideoTexture extends VideoTexture {
     }
 
     // caochangli - 补充功能
-    // 安卓 - LayaVideoDecoder.java 通过自定义桥接getPlayerInfo补充
+    // 安卓 - LayaVideoDecoder.java 通过自定义桥getPlayerInfo补充
     // 鸿蒙&IOS - Native代码在so中，无法扩展
     get playbackRate(): number {
         return this._playbackRate;
@@ -167,11 +167,12 @@ export class NativeVideoTexture extends VideoTexture {
                         // this.onLoad1(NativeVideoProxy.DCC_LOCAL_PATCH_TAG + result.localPath);
                         if (Browser.onAndroid)
                             this.onLoad1("file://" + result.localPath);
-                        // 鸿蒙沙雕 - so中写死了只有这个前缀的才满足不拼dcc前缀，又能走到layadcc._jsdown方法中
+                        // 鸿蒙 - C++中写死了只有这个前缀的才走到layadcc._jsdown方法中，再在_jsdown中将http://stand.alone.version/换成dcc前缀读取本地文件
                         else if (Browser.onOpenHarmonyOS)
                             this.onLoad1("http://stand.alone.version/" + src);
+                        // ios - C++中写死了只有这个前缀的才走到layadcc._jsdown方法中，再在_jsdown中将http://stand.alone.version/换成dcc前缀读取本地文件
                         else if (Browser.onIOS)
-                            this.onLoad1("file://" + result.localPath);
+                            this.onLoad1("http://stand.alone.version/" + src);
                         else
                             this.onLoad1("file://" + result.localPath);
                     }
@@ -232,7 +233,7 @@ export class NativeVideoTexture extends VideoTexture {
             }
         }).catch((err: any) => {
             // 错误返回，如：视频源不存在等
-            // 但：安卓收不到catch(通过自定义handleEvent桥接解决)，鸿蒙能收到,IOS待定
+            // 鸿蒙能收到，安卓收不到(通过自定义桥解决)，IOS收不到(C++中无法解决)
             if (!this._destroyed) {
                 console.warn("MgVideoTexture: " + (err && err.message ? err.message : ""));
                 this.event("error",err);
@@ -246,7 +247,7 @@ export class NativeVideoTexture extends VideoTexture {
             super.onBlur();
     }
 
-    /**caochangli - 获取视频信息(安卓视频功能调用) */
+    /**caochangli - 获取视频信息(仅安卓，鸿蒙、IOS Native代码全在C++中，无法扩展只能保持Laya原始逻辑) */
     private getDecoderInfo() {
         if (!Browser.onAndroid) return;
         try {
@@ -262,7 +263,7 @@ export class NativeVideoTexture extends VideoTexture {
         catch (e) { }
     }
 
-    /**调用native方法 - 安卓 */
+    /**调用native方法 - 仅安卓，鸿蒙、IOS Native代码全在C++中，无法扩展只能保持Laya原始逻辑 */
     private callVideoHelper(method:string,param:any = null) {
         if (!Browser.onAndroid) return null;
         if (!method || !this._videoID) return null;
