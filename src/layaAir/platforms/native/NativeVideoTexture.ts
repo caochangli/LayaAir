@@ -47,7 +47,7 @@ export class NativeVideoTexture extends VideoTexture {
                 if (!this._playing) {
                     //让画面显示出来，而不是黑色
                     this.render(true);
-                    //@ts-ignore
+                    //@ts-ignore - 暂停
                     this.decoder.wait(true);
                 }
             }
@@ -158,21 +158,26 @@ export class NativeVideoTexture extends VideoTexture {
             }
 
             // 使用 dcc 把视频下载到本地，使用本地路径播放
-            dccClient.updateFile(src).then((result: { isSucc: boolean, localPath: string }) => {
+            dccClient.updateFile(src,Browser.onIOS).then((result: { isSucc: boolean, localPath: string }) => {
                 if (!this._destroyed && this._source === url) {
                     if (result.isSucc && result.localPath) {
-                        // C++桥接层会给非http开头的url拼接上dcc前缀：
+                        // C++桥会给非http开头的url拼接上dcc前缀：
                         // 如 res/video/test.mp4 经C++拼接 https://projectq-client.sanguosha.com/dev_month/res/video/test.mp4
                         // 而本地路径非http开头，被拼上http后，变成到远程去下载了 - 需要做处理绕过C++拼前缀，又要native真正读取本地文件播放
-                        // this.onLoad1(NativeVideoProxy.DCC_LOCAL_PATCH_TAG + result.localPath);
                         if (Browser.onAndroid)
                             this.onLoad1("file://" + result.localPath);
-                        // 鸿蒙 - C++中写死了只有这个前缀的才走到layadcc._jsdown方法中，再在_jsdown中将http://stand.alone.version/换成dcc前缀读取本地文件
+                        // 鸿蒙 - 既要绕过C++拼dcc前缀，又要getUriFromPath(result.localPath)
+                        //        (1) "file://" + result.localPath - 没有getUriFromPath，C++读不到本地文件
+                        //        (2) getUriFromPath(result.localPath)得到file://*** - C++没有把file://去掉就去openFile，也读不到本地文件
+                        //        (3) 只能曲线救国：AI探测到C++中对于 http://stand.alone.version/ 域名的会执行到layadcc._jsdown方法中，
+                        //            再在_jsdown中将 http://stand.alone.version/ 换成dcc前缀，从本地拷贝一份镜像文件，使用镜像文件播放
                         else if (Browser.onOpenHarmonyOS)
                             this.onLoad1("http://stand.alone.version/" + src);
-                        // ios - C++中写死了只有这个前缀的才走到layadcc._jsdown方法中，再在_jsdown中将http://stand.alone.version/换成dcc前缀读取本地文件
+                        // ios - 既要绕过C++拼dcc前缀，又要文件带后缀 (如：.mp4)C++中写死了只有这个前缀的才走到layadcc._jsdown方法中，再在_jsdown中将http://stand.alone.version/换成dcc前缀读取本地文件(拷贝一份文件)
+                        //       采用从本地拷贝一份镜像文件，镜像文件名带上后缀，把镜像文件地址传给C++，使用镜像文件播放
                         else if (Browser.onIOS)
-                            this.onLoad1("http://stand.alone.version/" + src);
+                            // this.onLoad1("http://stand.alone.version/" + src);
+                            this.onLoad1("file://" + result.localPath);
                         else
                             this.onLoad1("file://" + result.localPath);
                     }
@@ -224,11 +229,12 @@ export class NativeVideoTexture extends VideoTexture {
         if (Browser.isIOSHighPerformanceModePlus)
             this._startOption.videoDataType = 2;
 
+        // Native默认自动播放 - 若不需要自动播放则frame事件中暂停
         this.decoder.start(this._startOption).then((res: any) => {
             if (!this._destroyed) {
                 this.getDecoderInfo();//caochangli - 获取视频信息
                 this.setLoaded(res.width, res.height, true);
-                if (!this._playing)
+                if (!this._playing)//不需要播放 - 标记状态在frame事件中暂停
                     this._waitFirstFrame = true;
             }
         }).catch((err: any) => {
@@ -241,8 +247,9 @@ export class NativeVideoTexture extends VideoTexture {
         });
     }
 
+    // caochangli - 重写方法
     protected onBlur() {
-        // native安卓 - 前后台切换暂停、恢复视频在native层已实现
+        // 安卓：前后台切换暂停、恢复视频在native层已实现
         if (!Browser.onAndroid)
             super.onBlur();
     }

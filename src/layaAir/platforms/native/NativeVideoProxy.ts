@@ -2,14 +2,18 @@ import { IVideoPlayerOptions } from "../../laya/media/VideoPlayerBackend";
 import { Browser } from "../../laya/utils/Browser";
 
 /**
- * native视频播放代理类
+ * native视频播放代理类 - 安卓&鸿蒙
  */
 export class NativeVideoProxy {
 
 //静态方法-------------------
-    // static DCC_LOCAL_PATCH_TAG:string = "[dccLocalPath]";
+
+    /**安卓 - 通过包路径反射到QGVideoHelper.java类 */
     static VIDEO_ANDROID_CLASS = "com.yoka.dgxj.libs.QGVideoHelper";
-    static VIDEO_HARMONRY_CLASS = "Harmonry.VideoPlayer";
+    /**鸿蒙 - 通过注册VideoPlayer.ets类各种桥接方法进行连接 */
+    static VIDEO_HARMONRY_CLASS = "VideoPlayer";
+    /**ios - 通过类名反射到QGVideoHelper.mm */
+    static VIDEO_IOS_CLASS = "QGVideoHelper";
 
     private static videoEventRegistered:boolean = false;
     private static videoIdSeed:number = 0;
@@ -21,6 +25,8 @@ export class NativeVideoProxy {
             return this.VIDEO_ANDROID_CLASS;
         if (Browser.onOpenHarmonyOS)
             return this.VIDEO_HARMONRY_CLASS;
+        if (Browser.onIOS)
+            return this.VIDEO_IOS_CLASS;
         return "";
     }
 
@@ -208,9 +214,9 @@ export class NativeVideoProxy {
         }
     }
 
-    /**调用native方法 - 目前仅处理了安卓 */
+    /**调用native方法 - 安卓&IOS */
     private callVideoHelper(method:string,param:any = null) {
-        if (!Browser.onAndroid) return;
+        if (!Browser.onAndroid && !Browser.onIOS) return;
         if (!method || !this._videoID) return;
         if (!param) param = {};
         param.id = this._videoID;
