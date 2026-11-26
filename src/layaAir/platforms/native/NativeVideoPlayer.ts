@@ -14,7 +14,7 @@ import { NativeVideoProxy } from "./NativeVideoProxy";
  * 解决方案：
  * - 安卓：扩展LayaVideoPlayer.java类再通过自定义桥补齐功能(不支持在游戏下层)，同时又写了一套原生播放器方式(NativeVideoProxy->QGVideoView.java)
  * - 鸿蒙：扩展VideoPlay.ets类再通过自定义桥补齐功能(duration、在游戏下层、loadedmetadata、ended、error)
- * - IOS：官方Native在C++中无法扩展，再写一套原生播放器方式
+ * - IOS：官方Native在C++中无法扩展，又写一套原生播放器方式(NativeVideoProxy->QGVideoView.mm)
  */
 export class NativeVideoPlayer extends VideoPlayerBackend {
     readonly video: any;
@@ -26,11 +26,12 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
     private _playbackRate: number = 1;
 
     //caochangli - 补充接口
-    private _duration:number = 0;
-    private _videoID:string;
-    private _isCustomVideo:boolean;
-    private _useLayaNativePlayer:boolean = false;
+    private _duration: number = 0;
     //caochangli - 补充接口
+
+    private _videoID: string;//自定义使用ID
+    private _useLayaNativePlayer: boolean = false;//强制使用官方视频播放功能
+    private _isCustomVideo: boolean;//使用的是否是自定义播放功能(目前仅对安卓、IOS又写了一套播放功能)
 
     get loop(): boolean {
         return this._loop;
@@ -237,8 +238,8 @@ export class NativeVideoPlayer extends VideoPlayerBackend {
                 playbackRate: this._playbackRate,
             }));
 
-        // caochangli - 安卓&鸿蒙 ended、error事件收不到，采用自定义桥实现(在自定义桥的loadedmetadata事件中执行setLoaded)
-        //            - ios ended、error事件同样收不到，但Native代码在C++中无法扩展 
+        // caochangli - 安卓&鸿蒙&ios ended、error事件收不到，其中安卓&鸿蒙通用自定义桥补充功能(在自定义桥的loadedmetadata事件中执行setLoaded)
+        //              而IOS源码在C++中无法扩展
         if (!Browser.onAndroid && !Browser.onOpenHarmonyOS && !Browser.onIOS) {
             this.video.onEnded(() => {
                 if (!this._owner || this._loop) return;

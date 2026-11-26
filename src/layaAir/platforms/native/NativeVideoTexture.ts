@@ -17,9 +17,10 @@ import { NativeVideoProxy } from "./NativeVideoProxy";
 export class NativeVideoTexture extends VideoTexture {
     readonly decoder: any;
 
+    private _videoID:string;//自定义使用ID
+
     //caochangli - 补充接口(安卓支持，鸿蒙&IOS不支持)
-    private _videoID:string;
-    private _duration:number = 0;
+    private _duration: number = 0;
     private _muted: boolean = false;
     private _volume: number = 1;
     private _playbackRate: number = 1;

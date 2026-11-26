@@ -2,7 +2,7 @@ import { IVideoPlayerOptions } from "../../laya/media/VideoPlayerBackend";
 import { Browser } from "../../laya/utils/Browser";
 
 /**
- * native视频播放代理类 - 安卓&鸿蒙
+ * native自定义视频播放代理类 - 安卓&鸿蒙
  */
 export class NativeVideoProxy {
 
